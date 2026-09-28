@@ -1,0 +1,2789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Climate Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+  CLIMATE GAME — responsive web game
+  Email accounts and score runs use the authenticated API;
+  cosmetic preferences are cached locally in the browser.
+   ============================================================ */
+
+:root{
+  --pine:#0E2A20;
+  --canopy:#1F5C45;
+  --leaf:#57C785;
+  --leaf-dim:#3E9868;
+  --dawn:#F2B441;
+  --ember:#E4573F;
+  --smog:#8C7B6B;
+  --mist:#F3F7F2;
+  --ink:#0B1710;
+  --glass:rgba(243,247,242,.08);
+  --glass-strong:rgba(243,247,242,.14);
+  --line:rgba(243,247,242,.12);
+  --radius-lg:26px;
+  --radius-md:18px;
+  --radius-sm:12px;
+  --shadow-soft:0 18px 40px rgba(3,10,7,.45);
+  --font-display:'Fredoka',ui-rounded,'Segoe UI',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+[hidden]{display:none!important;}
+body{
+  min-height:100dvh;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% -10%,#173c2c 0%,#081511 55%,#020604 100%);
+  font-family:var(--font-body);
+  color:var(--mist);
+  overflow:hidden;
+  overscroll-behavior:none;
+}
+button{font-family:inherit;color:inherit;cursor:pointer;}
+h1,h2,h3{font-family:var(--font-display);margin:0;}
+p{margin:0;}
+::selection{background:var(--leaf);color:var(--ink);}
+
+.phone{
+  position:relative;
+  width:100%;max-width:430px;
+  height:100dvh;
+  min-height:100dvh;
+  background:var(--pine);
+  overflow:hidden;
+  box-shadow:var(--shadow-soft);
+}
+@media (min-width:480px) and (min-height:760px){
+  body{padding:26px 0;}
+  .phone{height:860px;border-radius:46px;border:6px solid #04140d;}
+}
+
+.app{position:relative;width:100%;height:100%;display:flex;flex-direction:column;}
+
+/* ---------- shared screen chrome ---------- */
+.screen{flex:1;min-height:0;position:relative;overflow:hidden;padding-bottom:78px;}
+.scroll{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 20px 28px;position:relative;z-index:1;}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px 6px;
+}
+.topbar h2{font-size:1.05rem;letter-spacing:.2px;}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--font-display);font-weight:600;font-size:1.05rem;}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--leaf);box-shadow:0 0 10px var(--leaf);}
+.page-controls{
+  position:absolute;top:14px;right:14px;z-index:260;display:flex;gap:8px;
+  pointer-events:none;
+}
+.page-control-btn{
+  pointer-events:auto;border:none;border-radius:999px;padding:8px 12px;
+  background:rgba(3,10,7,.56);color:var(--mist);backdrop-filter:blur(8px);
+  border:1px solid rgba(243,247,242,.16);font-size:.78rem;font-weight:700;
+  display:inline-flex;align-items:center;gap:6px;box-shadow:0 10px 24px rgba(0,0,0,.18);
+}
+.page-control-btn:active{transform:scale(.97);}
+
+/* ---------- buttons ---------- */
+.btn{
+  border:none;border-radius:999px;padding:14px 22px;
+  font-family:var(--font-display);font-weight:600;font-size:.98rem;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .15s ease,filter .15s ease;
+  width:100%;
+}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:linear-gradient(180deg,var(--leaf),var(--leaf-dim));color:#06180F;box-shadow:0 10px 22px rgba(87,199,133,.28);}
+.btn-secondary{background:var(--glass-strong);color:var(--mist);border:1px solid var(--line);}
+.btn-ghost{background:transparent;color:var(--mist);opacity:.75;text-decoration:underline;padding:8px;width:auto;}
+.btn:focus-visible{outline:2px solid var(--dawn);outline-offset:2px;}
+
+/* ---------- cards / chips ---------- */
+.card{
+  background:var(--glass);border:1px solid var(--line);
+  border-radius:var(--radius-md);padding:16px;
+}
+.chip{
+  background:rgba(11,23,16,.55);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:999px;
+  padding:7px 14px;font-weight:600;font-size:.82rem;
+  font-variant-numeric:tabular-nums;
+}
+
+/* ============================================================
+   GAME TAB
+   ============================================================ */
+.game-screen{background:var(--pine);}
+
+/* -- onboarding & level-intro (full-screen light cards) -- */
+.onboarding-overlay,.intro-overlay{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  background:var(--mist);color:var(--ink);padding:28px 26px 30px;
+}
+.ob-top{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;}
+.ob-icon{font-size:64px;line-height:1;}
+.ob-top h1{font-size:1.5rem;color:var(--canopy);}
+.ob-top p{font-size:.98rem;line-height:1.5;color:#3a463f;max-width:320px;}
+.dots{display:flex;gap:7px;justify-content:center;margin-top:4px;}
+.dot{width:8px;height:8px;border-radius:999px;background:#c9d6cd;transition:all .25s ease;}
+.dot.active{width:22px;background:var(--leaf-dim);}
+
+.intro-overlay{justify-content:center;align-items:center;text-align:center;gap:16px;}
+.intro-card{background:#fff;border-radius:var(--radius-lg);padding:32px 26px;box-shadow:0 20px 40px rgba(0,0,0,.18);max-width:340px;}
+.intro-card h1{font-size:1.35rem;color:var(--canopy);margin-bottom:12px;}
+.intro-card p{font-size:.95rem;line-height:1.5;color:#3a463f;margin-bottom:22px;}
+
+/* ============================================================
+   SPLASH SCREEN — brand promo shown for 5s before the app opens
+   ============================================================ */
+.splash-overlay{
+  position:absolute;inset:0;z-index:200;
+  background:radial-gradient(circle at 50% 20%,#0f2540 0%,#0a1a2e 55%,#060f1c 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:22px;padding:32px;text-align:center;
+  transition:opacity .5s ease;
+}
+.splash-overlay.fade-out{opacity:0;pointer-events:none;}
+.splash-logos{display:flex;align-items:center;justify-content:center;gap:22px;}
+.splash-logo-img{width:150px;height:150px;border-radius:28px;object-fit:cover;box-shadow:0 12px 30px rgba(0,0,0,.4);}
+.splash-icon-badge{
+  width:92px;height:92px;border-radius:24px;
+  background:rgba(243,247,242,.06);border:1px solid var(--line);
+  box-shadow:0 12px 26px rgba(0,0,0,.35);
+  display:flex;align-items:center;justify-content:center;
+  animation:badge-float 3.6s ease-in-out infinite;
+}
+.splash-icon-badge svg{width:70%;height:70%;filter:drop-shadow(0 0 8px rgba(87,199,133,.35));}
+@keyframes badge-float{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+.splash-titles h1{font-size:1.15rem;color:var(--mist);margin-bottom:6px;}
+.splash-titles p{font-size:.85rem;color:rgba(243,247,242,.65);max-width:280px;}
+.splash-loader{width:180px;height:5px;border-radius:999px;background:rgba(243,247,242,.14);overflow:hidden;}
+.splash-loader-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,var(--dawn),var(--leaf));animation:splash-fill 5s linear forwards;}
+@keyframes splash-fill{from{width:0%;}to{width:100%;}}
+
+/* ============================================================
+   MAINTENANCE MODE — shown instead of the app whenever the admin
+   flips Settings > Maintenance mode on. Blocks new sessions and,
+   if flipped mid-session, takes over immediately. See applyMaintenance().
+   ============================================================ */
+.maintenance-overlay{
+  position:absolute;inset:0;z-index:400;
+  background:radial-gradient(circle at 50% 15%,#173c2c 0%,#081511 55%,#020604 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;gap:14px;padding:36px;
+}
+.maintenance-overlay .m-icon{font-size:52px;animation:badge-float 3.6s ease-in-out infinite;}
+.maintenance-overlay h1{font-size:1.25rem;color:var(--mist);}
+.maintenance-overlay p{font-size:.9rem;color:rgba(243,247,242,.7);line-height:1.5;max-width:300px;}
+.maintenance-overlay .m-sub{font-size:.72rem;color:rgba(243,247,242,.45);margin-top:6px;}
+
+/* ============================================================
+   WELCOME / HOW IT WORKS — shown before the first play flow
+   ============================================================ */
+.welcome-overlay{
+  position:absolute;inset:0;z-index:180;display:flex;flex-direction:column;
+  background:linear-gradient(145deg,#eaf6ee 0%,#f8fcf9 60%,#eef7f1 100%);color:var(--ink);
+  align-items:center;justify-content:center;text-align:center;padding:30px 24px;
+}
+.welcome-card{width:100%;max-width:340px;background:#fff;border-radius:var(--radius-lg);padding:24px 22px;box-shadow:0 20px 42px rgba(0,0,0,.16);}
+.welcome-card .w-icon{font-size:48px;margin-bottom:10px;}
+.welcome-card h1{font-size:1.28rem;color:var(--canopy);margin-bottom:10px;}
+.welcome-card p{font-size:.92rem;line-height:1.5;color:#3f5148;margin-bottom:12px;}
+.welcome-list{margin:12px 0 18px;padding:0;list-style:none;text-align:left;display:grid;gap:8px;}
+.welcome-list li{display:flex;gap:8px;align-items:flex-start;font-size:.84rem;color:#45564b;}
+.welcome-list .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--leaf);margin-top:6px;flex-shrink:0;}
+.welcome-actions{display:flex;flex-direction:column;gap:10px;}
+.welcome-actions .btn{width:100%;}
+
+/* ============================================================
+   REGISTRATION — required once before first play
+   ============================================================ */
+.register-overlay{
+  position:absolute;inset:0;z-index:150;display:flex;flex-direction:column;
+  background:var(--mist);color:var(--ink);padding:30px 26px;
+  align-items:center;justify-content:center;text-align:center;gap:16px;
+}
+.register-card{width:100%;max-width:340px;}
+.register-card .reg-icon{font-size:44px;margin-bottom:10px;}
+.register-card h1{font-size:1.3rem;color:var(--canopy);margin-bottom:8px;}
+.register-card p.reg-sub{font-size:.9rem;color:#3a463f;line-height:1.45;margin-bottom:18px;}
+.reg-tabs{display:flex;gap:8px;background:#eef3ee;border-radius:999px;padding:4px;margin-bottom:16px;}
+.reg-tab{flex:1;border:none;background:transparent;border-radius:999px;padding:9px 0;font-weight:700;font-size:.82rem;color:#5a6a5e;}
+.reg-tab.active{background:var(--canopy);color:#fff;}
+.reg-field{text-align:left;margin-bottom:14px;}
+.reg-field label{display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#7a8a7e;margin-bottom:6px;}
+.reg-field input{width:100%;border:1px solid #d7e2d9;border-radius:var(--radius-sm);padding:13px 14px;font-size:.95rem;background:#fff;color:var(--ink);}
+.reg-field input:focus{outline:2px solid var(--leaf);border-color:var(--leaf);}
+.reg-error{font-size:.8rem;color:var(--ember);margin:-6px 0 12px;min-height:1em;text-align:left;}
+.reg-note{font-size:.74rem;color:#7a8a7e;margin-top:14px;line-height:1.4;}
+.reg-consent{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin:0 0 14px;text-align:left;font-size:.74rem;line-height:1.35;color:#58685d;}
+.reg-consent label{display:flex;align-items:flex-start;gap:8px;}
+.reg-consent input{width:18px;height:18px;flex-shrink:0;margin:0;}
+.reg-consent a{color:var(--canopy);font-weight:700;white-space:nowrap;}
+
+/* ---------- background brand watermark (fixed, doesn't change by level) ---------- */
+.brand-watermark{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;opacity:.06;z-index:1;
+}
+.brand-watermark svg{width:62%;height:62%;}
+
+/* -- play area -- */
+.play-area{position:absolute;inset:0;}
+.scene{
+  position:absolute;inset:0;
+  --sat:1;--bri:1;
+  filter:saturate(var(--sat)) brightness(var(--bri));
+  transition:filter .7s ease;
+  overflow:hidden;
+}
+.scene.shake{animation:shake .32s ease;}
+@keyframes shake{
+  10%,90%{transform:translateX(-3px);}
+  20%,80%{transform:translateX(5px);}
+  30%,50%,70%{transform:translateX(-7px);}
+  40%,60%{transform:translateX(7px);}
+}
+/* ---------- photographic level backdrops (replace the old flat CSS sky/skyline) ----------
+   Two art pieces (day/"grow" scene + night/"circuit" scene) are swapped level to level and
+   rendered as layered, tilt-reactive, slowly-panning backdrops so the scene reads as a living
+   3D-ish world instead of a static picture. See applyTheme()/JS below for the level->image map. */
+.scene-photo-stage{position:absolute;inset:-6%;perspective:900px;}
+.scene-photo{
+  position:absolute;inset:0;background-size:cover;background-position:center;
+  opacity:0;pointer-events:none;
+  transform:translate3d(calc(var(--par-x,0) * -16px),calc(var(--par-y,0) * -12px),0) scale(1.08) rotateX(calc(var(--par-y,0) * -2deg)) rotateY(calc(var(--par-x,0) * 2deg));
+  transition:opacity 1s ease;
+  will-change:transform;
+}
+.scene-photo.active{opacity:1;animation:photo-kenburns 26s ease-in-out infinite alternate;}
+@keyframes photo-kenburns{
+  0%{transform:translate3d(calc(var(--par-x,0) * -16px),calc(var(--par-y,0) * -12px),0) scale(1.05) rotateX(calc(var(--par-y,0) * -2deg)) rotateY(calc(var(--par-x,0) * 2deg));}
+  100%{transform:translate3d(calc(var(--par-x,0) * -16px - 10px),calc(var(--par-y,0) * -12px - 8px),0) scale(1.16) rotateX(calc(var(--par-y,0) * -2deg)) rotateY(calc(var(--par-x,0) * 2deg));}
+}
+.scene-photo-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,14,10,.45) 0%,rgba(6,14,10,0) 22%,rgba(6,14,10,0) 62%,rgba(6,14,10,.62) 100%);pointer-events:none;z-index:2;}
+.smog-overlay{position:absolute;inset:0;background:radial-gradient(circle at 50% 30%,transparent 30%,rgba(60,45,35,.55) 100%);opacity:0;transition:opacity .7s ease;pointer-events:none;z-index:2;}
+.theme-chip{position:absolute;top:110px;left:16px;z-index:6;font-size:.7rem;opacity:0;transition:opacity .3s ease;pointer-events:none;}
+.theme-chip.show{opacity:1;}
+
+/* ============================================================
+   CLIMATE-TECH 3D-STYLE SCENERY — parallax layers used both in the
+   live gameplay scene and as an ambient background on every other
+   tab. Depth is faked via layered gradients/shadows + a pointer-
+   /tilt-driven parallax shift (see .parallax-layer + JS below),
+   plus small idle animations so it never reads as a "still" image.
+   ============================================================ */
+  position:absolute;top:0;left:0;right:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 16px 0;z-index:5;
+}
+.help-btn{
+  width:34px;height:34px;border-radius:50%;border:1px solid var(--line);
+  background:rgba(11,23,16,.55);backdrop-filter:blur(6px);
+  font-family:var(--font-display);font-weight:700;font-size:.9rem;
+}
+.combo-pop{
+  position:absolute;top:64px;left:50%;transform:translateX(-50%);
+  font-family:var(--font-display);font-weight:700;color:var(--dawn);
+  background:rgba(11,23,16,.6);border:1px solid var(--line);
+  padding:6px 16px;border-radius:999px;z-index:6;font-size:.9rem;
+  opacity:0;
+}
+.combo-pop.pulse{animation:combo-pulse .9s ease;}
+@keyframes combo-pulse{
+  0%{opacity:0;transform:translateX(-50%) scale(.7);}
+  20%{opacity:1;transform:translateX(-50%) scale(1.08);}
+  75%{opacity:1;transform:translateX(-50%) scale(1);}
+  100%{opacity:0;transform:translateX(-50%) scale(1);}
+}
+.storm-banner{
+  position:absolute;top:64px;left:16px;right:16px;z-index:6;
+  background:rgba(228,87,63,.92);color:#fff;border-radius:var(--radius-sm);
+  padding:10px 14px;font-weight:600;font-size:.85rem;text-align:center;
+  box-shadow:0 8px 20px rgba(0,0,0,.3);
+  animation:banner-in .3s ease;
+}
+@keyframes banner-in{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+
+.hud-bottom{position:absolute;left:16px;right:16px;bottom:16px;z-index:5;display:flex;flex-direction:column;gap:8px;}
+.bar-row{display:flex;align-items:center;gap:9px;}
+.bar-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;width:76px;opacity:.85;font-weight:600;}
+.bar{flex:1;height:9px;border-radius:999px;background:rgba(11,23,16,.55);overflow:hidden;border:1px solid var(--line);}
+.bar-fill{height:100%;border-radius:999px;transition:width .3s ease;}
+.bar-fill.health{background:linear-gradient(90deg,var(--leaf-dim),var(--leaf));}
+.bar-fill.progress{background:linear-gradient(90deg,var(--dawn),#f7d488);}
+.bar-value{font-size:.72rem;font-weight:700;width:46px;text-align:right;font-variant-numeric:tabular-nums;}
+
+.pause-btn{
+  position:absolute;right:16px;bottom:96px;z-index:5;
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(11,23,16,.6);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:1rem;
+}
+
+/* -- pause / complete / gameover overlays -- */
+.state-overlay{
+  position:absolute;inset:0;z-index:20;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(6,14,10,.72);backdrop-filter:blur(3px);
+  padding:26px;text-align:center;
+}
+.state-card{background:var(--mist);color:var(--ink);border-radius:var(--radius-lg);padding:30px 26px;width:100%;max-width:320px;box-shadow:0 24px 50px rgba(0,0,0,.35);}
+.state-card h2{font-size:1.3rem;color:var(--canopy);margin-bottom:14px;}
+.fact-box{background:#e7f0e8;border-radius:var(--radius-sm);padding:14px 16px;font-size:.88rem;line-height:1.45;color:#2c3a30;margin-bottom:20px;}
+.state-card p.msg{font-size:.9rem;line-height:1.5;color:#3a463f;margin-bottom:20px;}
+.state-card .btn+.btn{margin-top:10px;}
+
+/* -- legend modal -- */
+.legend-overlay{
+  position:fixed;inset:0;z-index:50;
+  background:rgba(6,14,10,.78);backdrop-filter:blur(3px);
+  display:flex;align-items:flex-end;justify-content:center;
+}
+.legend-sheet{
+  background:var(--mist);color:var(--ink);width:100%;max-width:430px;
+  border-radius:26px 26px 0 0;padding:22px 22px 30px;max-height:78vh;overflow-y:auto;
+  position:relative;
+}
+.legend-sheet-close{
+  position:absolute;top:14px;right:14px;
+  width:34px;height:34px;border:none;border-radius:50%;background:rgba(255,255,255,.92);
+  color:var(--ink);font-size:1.3rem;line-height:1;cursor:pointer;
+}
+.legend-sheet h2{color:var(--canopy);font-size:1.15rem;margin-bottom:4px;}
+.legend-sheet .sub{font-size:.85rem;color:#5a6a5e;margin-bottom:16px;}
+.legend-key{display:flex;gap:16px;margin-bottom:16px;}
+.legend-key span{display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:600;}
+.swatch{width:16px;height:16px;border-radius:50%;border:3px solid;}
+.swatch.good{border-color:var(--leaf);}
+.swatch.bad{border-color:var(--ember);}
+.legend-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.legend-item{display:flex;align-items:center;gap:8px;background:#fff;border-radius:var(--radius-sm);padding:9px 10px;border:2px solid;}
+.legend-item.ring-good{border-color:rgba(87,199,133,.5);}
+.legend-item.ring-bad{border-color:rgba(228,87,63,.5);}
+.legend-emoji{font-size:20px;}
+.legend-label{font-size:.74rem;flex:1;line-height:1.2;}
+.legend-pts{font-size:.72rem;font-weight:700;font-family:var(--font-display);}
+
+/* ============================================================
+   INVITE TAB
+   ============================================================ */
+.invite-screen{background:linear-gradient(180deg,#bfe3f2 0%,#eaf6ee 55%,#f3f7f2 100%);color:var(--ink);}
+.invite-hero{text-align:center;padding:36px 12px 8px;}
+.invite-hero .globe{font-size:56px;}
+.invite-hero h1{font-size:1.5rem;color:var(--canopy);margin:14px 0 8px;line-height:1.2;}
+.invite-hero p{font-size:.92rem;color:#4a5a4f;max-width:280px;margin:0 auto;}
+.invite-card{background:#fff;border-radius:var(--radius-lg);padding:20px;margin-top:22px;box-shadow:0 14px 30px rgba(20,50,35,.1);}
+.invite-card label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#7a8a7e;font-weight:700;}
+.link-row{display:flex;gap:8px;margin:8px 0 16px;}
+.link-row .link-text{
+  flex:1;background:#eef3ee;border-radius:var(--radius-sm);padding:12px 14px;
+  font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#33443a;
+}
+.icon-btn{width:44px;height:44px;flex-shrink:0;border-radius:var(--radius-sm);background:var(--canopy);color:#fff;border:none;display:flex;align-items:center;justify-content:center;}
+.invite-stats{display:flex;gap:10px;margin:16px 0;}
+.invite-stat{flex:1;background:#eef6f0;border-radius:var(--radius-sm);padding:12px;text-align:center;}
+.invite-stat b{display:block;font-family:var(--font-display);font-size:1.15rem;color:var(--canopy);}
+.invite-stat span{font-size:.68rem;color:#5a6a5e;}
+.invite-note{font-size:.78rem;color:#5a6a5e;text-align:center;margin-top:14px;line-height:1.4;}
+
+/* ============================================================
+   LEADERBOARD TAB
+   ============================================================ */
+.leaderboard-screen{background:linear-gradient(180deg,#bfe3f2 0%,#eaf6ee 60%,#f3f7f2 100%);color:var(--ink);}
+.lead-hero{text-align:center;padding:30px 12px 6px;}
+.lead-hero .cup{font-size:48px;}
+.lead-hero h1{font-size:1.3rem;color:var(--canopy);margin-top:8px;}
+.period-tabs{display:flex;gap:8px;margin:18px 0 14px;background:#fff;padding:5px;border-radius:999px;box-shadow:0 8px 18px rgba(20,50,35,.08);}
+.period-pill{flex:1;border:none;background:transparent;border-radius:999px;padding:9px 0;font-weight:600;font-size:.8rem;color:#5a6a5e;}
+.period-pill.active{background:var(--canopy);color:#fff;}
+.lead-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+.lead-row{
+  display:flex;align-items:center;gap:12px;background:#fff;border-radius:var(--radius-sm);
+  padding:10px 14px;box-shadow:0 4px 12px rgba(20,50,35,.06);
+}
+.lead-row.me{background:linear-gradient(90deg,#eafaf0,#fff);border:2px solid var(--leaf);}
+.lead-rank{width:22px;font-family:var(--font-display);font-weight:700;color:#7a8a7e;text-align:center;}
+.lead-row:nth-child(1) .lead-rank{color:var(--dawn);}
+.lead-row:nth-child(2) .lead-rank{color:#9aa5ab;}
+.lead-row:nth-child(3) .lead-rank{color:#c98a54;}
+.lead-avatar{
+  width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--leaf),var(--canopy));
+  color:#fff;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0;
+}
+.lead-name{flex:1;font-size:.86rem;font-weight:600;color:#28352c;}
+.lead-score{font-family:var(--font-display);font-weight:700;font-size:.86rem;color:var(--canopy);}
+.my-rank-row{margin-top:10px;border:2px dashed #9fbfa8;}
+
+/* ============================================================
+   PROFILE TAB
+   ============================================================ */
+.profile-screen{background:linear-gradient(180deg,#bfe3f2 0%,#eaf6ee 60%,#f3f7f2 100%);color:var(--ink);}
+.profile-hero{text-align:center;padding:34px 12px 10px;}
+.avatar{
+  width:88px;height:88px;border-radius:50%;margin:0 auto 14px;
+  background:linear-gradient(135deg,var(--leaf),var(--canopy));
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-size:2.1rem;font-weight:700;color:#fff;
+  border:4px solid #fff;box-shadow:0 10px 24px rgba(20,50,35,.18);
+}
+.profile-hero h1{font-size:1.2rem;}
+.profile-hero .uname{font-size:.85rem;color:#6a7a6e;margin-top:2px;}
+.profile-hero .tagline{font-size:.82rem;color:#4a5a4f;margin-top:6px;font-style:italic;}
+.tier-badge{
+  display:inline-flex;align-items:center;gap:6px;margin-top:12px;
+  background:#fff;border-radius:999px;padding:8px 16px;font-weight:700;font-size:.85rem;
+  box-shadow:0 6px 16px rgba(20,50,35,.1);
+}
+.edit-profile-btn{
+  display:inline-flex;align-items:center;gap:6px;margin-top:10px;
+  background:#fff;border:1px solid #e2e9e3;border-radius:999px;padding:7px 14px;
+  font-size:.78rem;font-weight:700;color:var(--canopy);
+}
+.about-block{margin-top:22px;}
+.about-block h3{font-size:.78rem;text-transform:uppercase;letter-spacing:.07em;color:#6a7a6e;margin-bottom:10px;}
+.about-block .card-text{background:#fff;border-radius:var(--radius-sm);padding:14px 16px;font-size:.82rem;line-height:1.55;color:#3a463f;box-shadow:0 4px 12px rgba(20,50,35,.05);}
+.about-block .card-text b{color:var(--canopy);}
+
+/* ---------- announcements (admin-posted events & promotions) ---------- */
+.announcements-block{margin-top:22px;}
+.announcements-block h3{font-size:.78rem;text-transform:uppercase;letter-spacing:.07em;color:#6a7a6e;margin-bottom:10px;}
+.announce-card{background:#fff;border-radius:var(--radius-sm);padding:13px 15px;box-shadow:0 4px 12px rgba(20,50,35,.05);display:flex;gap:11px;margin-bottom:10px;}
+.announce-card:last-child{margin-bottom:0;}
+.announce-card .ac-emoji{font-size:1.3rem;line-height:1;}
+.announce-card .ac-title-row{display:flex;align-items:center;gap:8px;margin-bottom:3px;}
+.announce-card .ac-title{font-weight:700;font-size:.86rem;color:var(--ink);}
+.announce-card .ac-tag{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:999px;padding:2px 8px;flex-shrink:0;}
+.announce-card .ac-tag.event{background:#e6f0fd;color:#2559a8;}
+.announce-card .ac-tag.promo{background:#fff4e0;color:#a6740f;}
+.announce-card .ac-body{font-size:.78rem;color:#4a5a4f;line-height:1.4;}
+.updates-screen{background:linear-gradient(180deg,#e9f5ee 0%,#f7fbf7 100%);color:var(--ink);}
+.updates-shell{padding:22px 16px 28px;display:flex;flex-direction:column;gap:12px;}
+.update-section{background:rgba(255,255,255,.9);border:1px solid rgba(31,92,69,.12);border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(14,42,32,.06);}
+.update-section h3{font-size:1rem;color:var(--canopy);margin-bottom:8px;}
+.update-section .sub{font-size:.78rem;color:#5e7067;margin-bottom:10px;line-height:1.4;}
+.update-empty{font-size:.82rem;color:#6f827a;padding:10px 0 4px;}
+.field{margin-bottom:14px;text-align:left;}
+.field label{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#7a8a7e;font-weight:700;margin-bottom:6px;}
+.field input,.field textarea{
+  width:100%;border:1px solid #d7e2d9;border-radius:var(--radius-sm);padding:11px 13px;
+  font-family:var(--font-body);font-size:.9rem;color:var(--ink);background:#fff;resize:none;
+}
+.field input:focus,.field textarea:focus{outline:2px solid var(--leaf);border-color:var(--leaf);}
+.avatar-upload-row{display:flex;align-items:center;gap:14px;}
+.avatar-upload-preview{
+  width:64px;height:64px;border-radius:50%;flex-shrink:0;overflow:hidden;
+  background:linear-gradient(135deg,var(--leaf),var(--canopy));
+  display:flex;align-items:center;justify-content:center;font-size:1.7rem;color:#fff;
+  border:2px solid #fff;box-shadow:0 4px 12px rgba(20,50,35,.15);
+}
+.avatar-upload-preview img{width:100%;height:100%;object-fit:cover;display:block;}
+.avatar-upload-actions{display:flex;flex-direction:column;gap:4px;align-items:flex-start;}
+.emoji-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.emoji-opt{width:42px;height:42px;border-radius:50%;border:2px solid #e2e9e3;background:#fff;font-size:1.2rem;display:flex;align-items:center;justify-content:center;}
+.emoji-opt.active{border-color:var(--leaf);background:#eafaf0;}
+.color-grid{display:flex;gap:10px;}
+.color-opt{width:36px;height:36px;border-radius:50%;border:3px solid transparent;}
+.color-opt.active{border-color:var(--ink);}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px;}
+.stat-card{background:#fff;border-radius:var(--radius-sm);padding:14px;box-shadow:0 4px 12px rgba(20,50,35,.06);}
+.stat-card b{display:block;font-family:var(--font-display);font-size:1.25rem;color:var(--canopy);}
+.stat-card span{font-size:.7rem;color:#6a7a6e;}
+.settings-block{margin-top:22px;}
+.settings-block h3{font-size:.78rem;text-transform:uppercase;letter-spacing:.07em;color:#6a7a6e;margin-bottom:10px;}
+.setting-row{
+  display:flex;align-items:center;justify-content:space-between;background:#fff;
+  border-radius:var(--radius-sm);padding:13px 16px;margin-bottom:8px;box-shadow:0 4px 12px rgba(20,50,35,.05);
+}
+.setting-row span{font-size:.86rem;font-weight:600;}
+.toggle{width:44px;height:26px;border-radius:999px;background:#d7e2d9;border:none;position:relative;transition:background .2s ease;}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:transform .2s ease;}
+.toggle.on{background:var(--leaf);}
+.toggle.on::after{transform:translateX(18px);}
+.lang-pills{display:flex;gap:6px;background:#eef3ee;border-radius:999px;padding:3px;}
+.lang-pill{border:none;background:transparent;border-radius:999px;padding:5px 12px;font-size:.74rem;font-weight:700;color:#5a6a5e;}
+.lang-pill.active{background:var(--canopy);color:#fff;}
+
+/* ============================================================
+   BOTTOM NAV
+   ============================================================ */
+.bottom-nav{
+  position:relative;z-index:30;display:flex;background:var(--canopy);
+  padding:9px 6px calc(9px + env(safe-area-inset-bottom));
+  border-top:1px solid rgba(255,255,255,.08);
+  min-height:72px;
+  flex-shrink:0;
+}
+.nav-btn{
+  flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:7px 0;border-radius:14px;color:rgba(255,255,255,.6);font-size:.68rem;font-weight:600;
+}
+.nav-btn svg{width:21px;height:21px;}
+.nav-btn.active{color:#fff;background:rgba(255,255,255,.1);}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:var(--mist);padding:11px 20px;border-radius:999px;
+  font-size:.82rem;font-weight:600;z-index:80;opacity:0;transition:all .25s ease;
+  box-shadow:0 10px 24px rgba(0,0,0,.4);white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms!important;transition-duration:.001ms!important;}
+}
+</style>
+</head>
+<body>
+<script>
+  // Early diagnostic: show overlay if main script fails to initialize
+  (function(){
+    try{
+      document.addEventListener('DOMContentLoaded', ()=>{
+        setTimeout(()=>{
+          if(!window.gameDebug){
+            console.error('Preview init failure: main script did not set window.gameDebug');
+            try{
+              var d = document.createElement('div');
+              d.id = 'preview-init-fail';
+              d.style.position = 'fixed'; d.style.inset = '12px'; d.style.zIndex = 9999;
+              d.style.background = 'rgba(255,255,255,0.96)'; d.style.color = '#111'; d.style.border = '2px solid #E4573F';
+              d.style.padding = '18px'; d.style.borderRadius = '12px'; d.style.fontFamily = 'sans-serif'; d.style.fontSize='14px';
+              d.textContent = 'Game failed to initialize — open DevTools Console for errors.';
+              document.body.prepend(d);
+            }catch(_){/* ignore DOM errors */}
+          }
+        }, 800);
+      });
+    }catch(e){ /* ignore */ }
+  })();
+</script>
+<div class="phone"><div class="app" id="app">
+  <div class="page-controls">
+    <button class="page-control-btn" id="refreshBtn" type="button">↻ Refresh</button>
+  </div>
+
+  <!-- ============ GAME TAB ============ -->
+  <section class="screen game-screen" data-tab="game">
+
+    <!-- ============ SPLASH / PROMO (shown ~5s on open) ============ -->
+    <div class="splash-overlay" id="splashScreen">
+      <div class="splash-logos">
+        <div class="splash-icon-badge" aria-hidden="true" title="Climate Tech Innovation">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="innoGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#F2B441"/>
+                <stop offset="100%" stop-color="#57C785"/>
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="46" fill="rgba(243,247,242,.08)" stroke="url(#innoGrad)" stroke-width="2.5"/>
+            <path d="M50 20c-11 0-19 8-19 18 0 7 4 11 7 15 2 2.4 3 4 3 6.5h18c0-2.5 1-4.1 3-6.5 3-4 7-8 7-15 0-10-8-18-19-18z" fill="url(#innoGrad)"/>
+            <rect x="41" y="62" width="18" height="5" rx="2" fill="#0B1710"/>
+            <rect x="43" y="69" width="14" height="4" rx="2" fill="#0B1710"/>
+            <path d="M50 30v11M44 36h12" stroke="#0B1710" stroke-width="2" stroke-linecap="round"/>
+            <path d="M14 50h10M76 50h10M50 14v-6M25 25l7 7M75 25l-7 7" stroke="url(#innoGrad)" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="14" cy="50" r="3" fill="#F2B441"/>
+            <circle cx="86" cy="50" r="3" fill="#57C785"/>
+          </svg>
+        </div>
+        <img class="splash-logo-img" alt="ADA Technology Solutions" src="data:image/jpeg;base64,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">
+      </div>
+      <div class="splash-titles">
+        <h1 id="splashTitle">ADA Technology Solutions</h1>
+        <p id="splashSubtitle">Presents Climate Game — part of the Climate Tech Initiative</p>
+      </div>
+      <div class="splash-loader"><div class="splash-loader-fill"></div></div>
+    </div>
+
+    <!-- ============ WELCOME / HOW IT WORKS ============ -->
+    <div class="welcome-overlay" id="welcomeIntro" hidden>
+      <div class="welcome-card">
+        <div class="w-icon">🌿</div>
+        <h1>How Climate Game Works</h1>
+        <p>Tap the eco-friendly actions, avoid the hazards, and build your Eco-Score as the levels get faster and smarter.</p>
+        <ul class="welcome-list">
+          <li><span class="dot"></span><span>Good taps raise your score and Planet Health.</span></li>
+          <li><span class="dot"></span><span>Hazards hurt your health and make the game harder.</span></li>
+          <li><span class="dot"></span><span>Higher levels shuffle the falling icons faster, so stay sharp.</span></li>
+        </ul>
+        <div class="welcome-actions">
+          <button class="btn btn-primary" id="welcomeStartBtn">Start Playing</button>
+          <button class="btn btn-secondary" id="welcomeSkipBtn">Skip Intro</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MAINTENANCE MODE (admin-controlled) ============ -->
+    <div class="maintenance-overlay" id="maintenanceScreen" hidden>
+      <div class="m-icon">🛠️</div>
+      <h1>We'll be back soon</h1>
+      <p>Climate Game is offline for a quick update. Thanks for your patience — check back shortly!</p>
+      <div class="m-sub">Maintenance mode is on</div>
+    </div>
+
+    <!-- ============ REGISTRATION (required once, before any play) ============ -->
+    <div class="register-overlay" id="registerScreen" hidden>
+      <div class="register-card">
+        <div class="reg-icon">🌍</div>
+        <h1>Join Climate Game</h1>
+        <p class="reg-sub">Create an account to save your progress and compete on any device. Your email is for sign-in; other players see only your display name.</p>
+        <div class="reg-field">
+          <label>Display Name</label>
+          <input type="text" id="regInput" placeholder="Green Explorer" maxlength="24" autocomplete="nickname" inputmode="text">
+        </div>
+        <div class="reg-field">
+          <label>Email</label>
+          <input type="email" id="regEmail" placeholder="you@example.com" maxlength="254" autocomplete="email" inputmode="email">
+        </div>
+        <div class="reg-field">
+          <label>Password</label>
+          <input type="password" id="regPassword" placeholder="At least 8 characters" minlength="8" autocomplete="new-password">
+        </div>
+        <div class="reg-consent" id="leaderboardConsentWrap">
+          <label><input type="checkbox" id="leaderboardConsent"> <span>Show my display name and scores in the public leaderboard.</span></label>
+          <a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy information</a>
+        </div>
+        <div class="reg-error" id="regError"></div>
+        <button class="btn btn-primary" id="regSubmitBtn">Create Account</button>
+        <button class="btn btn-ghost" id="authModeBtn" type="button">Already registered? Sign in</button>
+        <p class="reg-note">Use the same email and password on each device. Email confirmation may be required.</p>
+      </div>
+    </div>
+
+    <div class="onboarding-overlay" id="onboarding" hidden>
+      <div class="ob-top">
+        <div class="ob-icon" id="obIcon">🌱</div>
+        <h1 id="obTitle">Small taps, real impact</h1>
+        <p id="obBody">Catch eco-friendly actions before they fall past you.</p>
+      </div>
+      <div class="dots" id="obDots">
+        <span class="dot active"></span><span class="dot"></span><span class="dot"></span>
+      </div>
+      <button class="btn btn-primary" id="obBtn" style="margin-top:22px;">Continue</button>
+    </div>
+
+    <div class="intro-overlay" id="levelIntro" hidden>
+      <div class="intro-card">
+        <h1 id="introTitle">Level 1: Climate Tap Challenge</h1>
+        <p id="introBody">Tap eco-friendly items to score points and avoid climate-harming ones.</p>
+        <button class="btn btn-primary" id="introStartBtn">Start Level</button>
+      </div>
+    </div>
+
+    <div class="play-area" id="playArea" hidden>
+      <div class="scene" id="scene">
+        <div class="scene-photo-stage parallax-layer" style="--depth:6;" aria-hidden="true">
+          <div class="scene-photo" id="scenePhotoDay" style="background-image:linear-gradient(155deg,#9bd6b3 0%,#397d5b 48%,#0e2a20 100%);"></div>
+          <div class="scene-photo" id="scenePhotoNight" style="background-image:linear-gradient(155deg,#24455b 0%,#15362f 48%,#081511 100%);"></div>
+        </div>
+        <div class="scene-photo-shade"></div>
+        <div class="tech-grid parallax-layer" style="--depth:4;"></div>
+        <div class="eco-particles" aria-hidden="true">
+          <div class="eco-particle" style="left:10%;--drift:18px;animation-duration:7s;animation-delay:0s;"></div>
+          <div class="eco-particle" style="left:28%;--drift:-14px;animation-duration:9s;animation-delay:1.4s;"></div>
+          <div class="eco-particle" style="left:48%;--drift:10px;animation-duration:6.5s;animation-delay:2.6s;"></div>
+          <div class="eco-particle" style="left:64%;--drift:-18px;animation-duration:8s;animation-delay:.7s;"></div>
+          <div class="eco-particle" style="left:82%;--drift:16px;animation-duration:7.5s;animation-delay:3.3s;"></div>
+        </div>
+        <div class="smog-overlay" id="smogOverlay"></div>
+        <div class="brand-watermark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="32" cy="32" r="30" stroke="#F3F7F2" stroke-width="2"/>
+            <path d="M32 10c8 6 12 14 12 22s-4 16-12 22c-8-6-12-14-12-22s4-16 12-22z" fill="#F3F7F2"/>
+            <path d="M32 14v36M20 24h24M18 40h28" stroke="#0E2A20" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="items-layer" id="itemsLayer"></div>
+      </div>
+
+      <div class="hud-top">
+        <div class="chip" id="chipTime">Time: 30s</div>
+        <button class="help-btn" id="helpBtn" aria-label="How to play">?</button>
+        <div class="chip" id="chipScore">Eco-Score: 0</div>
+      </div>
+      <div class="combo-pop" id="comboPop"></div>
+      <div class="chip theme-chip" id="themeChip">📍 Downtown Smog Line</div>
+      <div class="storm-banner" id="stormBanner" hidden>⚠️ Pollution Storm — avoid red-ringed items!</div>
+
+      <div class="hud-bottom">
+        <div class="bar-row">
+          <span class="bar-label">Planet Health</span>
+          <div class="bar"><div class="bar-fill health" id="healthFill" style="width:100%"></div></div>
+          <span class="bar-value" id="healthValue">100%</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label">Level Progress</span>
+          <div class="bar"><div class="bar-fill progress" id="progressFill" style="width:0%"></div></div>
+          <span class="bar-value" id="progressValue">0/40</span>
+        </div>
+      </div>
+      <button class="pause-btn" id="pauseBtn" aria-label="Pause">❚❚</button>
+
+      <div class="state-overlay" id="pauseOverlay" hidden>
+        <div class="state-card">
+          <h2>Game Paused</h2>
+          <div class="fact-box" id="factText">🌍 Fact loading…</div>
+          <button class="btn btn-primary" id="resumeBtn">Continue</button>
+          <button class="btn btn-secondary" id="restartBtn">Restart Level</button>
+          <button class="btn btn-ghost" id="endGameBtn">Exit</button>
+        </div>
+      </div>
+
+      <div class="state-overlay" id="completeOverlay" hidden>
+        <div class="state-card">
+          <h2 id="completeTitle">Level Complete! 🎉</h2>
+          <p class="msg" id="completeBody">Great job!</p>
+          <button class="btn btn-primary" id="nextLevelBtn">Next Level ➡️</button>
+        </div>
+      </div>
+
+      <div class="state-overlay" id="gameoverOverlay" hidden>
+        <div class="state-card">
+          <h2 id="gameoverTitle">Time's Up ⏳</h2>
+          <p class="msg" id="gameoverBody">So close — try again.</p>
+          <button class="btn btn-primary" id="retryBtn">Retry Level</button>
+          <button class="btn btn-ghost" id="restartFromOneLink">Restart from Level 1</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ UPDATES TAB ============ -->
+  <section class="screen updates-screen" data-tab="updates" hidden>
+    <div class="updates-shell">
+      <div class="update-section">
+        <h3>🌍 Climate Events</h3>
+        <div class="sub">Community challenges and impact campaigns posted by the admin.</div>
+        <div id="eventsList"></div>
+      </div>
+      <div class="update-section">
+        <h3>🎁 Promotions</h3>
+        <div class="sub">Special rewards, partner offers, and bonus opportunities.</div>
+        <div id="promosList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INVITE TAB ============ -->
+  <section class="screen invite-screen" data-tab="invite" hidden>
+      <div class="tech-illustration parallax-layer" style="--depth:10;" aria-hidden="true">
+        <svg viewBox="0 0 400 220" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0 190c40-22 90-30 130-14 46 18 80-6 130 4 44 9 80 26 140 10v30H0z" fill="#1F5C45"/>
+          <path d="M0 205c60-14 120-8 170 2 60 12 130-4 230 8v5H0z" fill="#57C785" opacity=".55"/>
+          <g transform="translate(64,150)">
+            <line x1="0" y1="0" x2="0" y2="-96" stroke="#1F5C45" stroke-width="4"/>
+            <circle cx="0" cy="-96" r="4" fill="#0E2A20"/>
+            <g class="svg-blades" transform="translate(0,-96)">
+              <path d="M0 0 L4 -34 A5 5 0 0 1 -4 -34 Z" fill="#1F5C45"/>
+              <path d="M0 0 L30 18 A5 5 0 0 1 26 26 Z" fill="#1F5C45"/>
+              <path d="M0 0 L-30 18 A5 5 0 0 1 -26 26 Z" fill="#1F5C45"/>
+            </g>
+          </g>
+          <g transform="translate(300,138)">
+            <line x1="0" y1="0" x2="0" y2="-72" stroke="#1F5C45" stroke-width="3"/>
+            <circle cx="0" cy="-72" r="3" fill="#0E2A20"/>
+            <g class="svg-blades slow" transform="translate(0,-72)">
+              <path d="M0 0 L3 -26 A4 4 0 0 1 -3 -26 Z" fill="#1F5C45"/>
+              <path d="M0 0 L22 13 A4 4 0 0 1 19 19 Z" fill="#1F5C45"/>
+              <path d="M0 0 L-22 13 A4 4 0 0 1 -19 19 Z" fill="#1F5C45"/>
+            </g>
+          </g>
+          <g transform="translate(150,168) rotate(-8)">
+            <rect x="0" y="0" width="90" height="34" rx="3" fill="#1F5C45"/>
+            <path d="M0 0 90 0 M0 11 90 11 M0 22 90 22 M0 33 90 33 M22 0 22 34 M45 0 45 34 M67 0 67 34" stroke="#57C785" stroke-width="1" opacity=".6"/>
+          </g>
+          <g transform="translate(210,148)">
+            <path d="M0 42C0 20 10 4 22 4c8 0 12 8 12 8s6-14 20-14 22 12 22 26c0 14-12 22-38 22-16 0-38-3-38-3z" fill="#1F5C45"/>
+            <path d="M22 42V16M22 24l-10-7M22 20l12-9M22 30l14 4" stroke="#57C785" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="12" cy="17" r="2.4" fill="#F2B441"/>
+            <circle cx="34" cy="11" r="2.4" fill="#F2B441"/>
+            <circle cx="36" cy="34" r="2.4" fill="#F2B441"/>
+          </g>
+          <g stroke="#1F5C45" stroke-width="1" opacity=".5">
+            <path d="M64 60 L150 40 M150 40 L300 66 M300 66 L360 30"/>
+          </g>
+          <circle class="svg-node" cx="150" cy="40" r="3" fill="#F2B441"/>
+          <circle class="svg-node" cx="360" cy="30" r="3" fill="#57C785"/>
+        </svg>
+      </div>
+    <div class="scroll">
+      <div class="invite-hero">
+        <div class="globe">🌍</div>
+        <h1>Invite Friends<br>to Play</h1>
+        <p>Share the game with friends. Referral tracking and shared rewards are not active in this preview.</p>
+      </div>
+      <div class="invite-card">
+        <label>Your Referral Link</label>
+        <div class="link-row">
+          <div class="link-text" id="inviteLink">https://t.me/ClimateGameBot?start=NAS4181</div>
+          <button class="icon-btn" id="copyBtn" aria-label="Copy link">⧉</button>
+        </div>
+        <button class="btn btn-primary" id="shareBtn">📨 Invite a Friend</button>
+        <div class="invite-stats">
+          <div class="invite-stat"><b id="inviteFriendsCount">0</b><span>Local referral count</span></div>
+          <div class="invite-stat"><b id="inviteBonusEarned">0</b><span>Bonuses unavailable</span></div>
+        </div>
+        <p class="invite-note">Your progress is stored on this device and is not shared with other players.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LEADERBOARD TAB ============ -->
+  <section class="screen leaderboard-screen" data-tab="leaderboard" hidden>
+      <div class="tech-illustration parallax-layer" style="--depth:10;" aria-hidden="true">
+        <svg viewBox="0 0 400 220" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0 190c40-22 90-30 130-14 46 18 80-6 130 4 44 9 80 26 140 10v30H0z" fill="#1F5C45"/>
+          <path d="M0 205c60-14 120-8 170 2 60 12 130-4 230 8v5H0z" fill="#57C785" opacity=".55"/>
+          <g transform="translate(64,150)">
+            <line x1="0" y1="0" x2="0" y2="-96" stroke="#1F5C45" stroke-width="4"/>
+            <circle cx="0" cy="-96" r="4" fill="#0E2A20"/>
+            <g class="svg-blades" transform="translate(0,-96)">
+              <path d="M0 0 L4 -34 A5 5 0 0 1 -4 -34 Z" fill="#1F5C45"/>
+              <path d="M0 0 L30 18 A5 5 0 0 1 26 26 Z" fill="#1F5C45"/>
+              <path d="M0 0 L-30 18 A5 5 0 0 1 -26 26 Z" fill="#1F5C45"/>
+            </g>
+          </g>
+          <g transform="translate(300,138)">
+            <line x1="0" y1="0" x2="0" y2="-72" stroke="#1F5C45" stroke-width="3"/>
+            <circle cx="0" cy="-72" r="3" fill="#0E2A20"/>
+            <g class="svg-blades slow" transform="translate(0,-72)">
+              <path d="M0 0 L3 -26 A4 4 0 0 1 -3 -26 Z" fill="#1F5C45"/>
+              <path d="M0 0 L22 13 A4 4 0 0 1 19 19 Z" fill="#1F5C45"/>
+              <path d="M0 0 L-22 13 A4 4 0 0 1 -19 19 Z" fill="#1F5C45"/>
+            </g>
+          </g>
+          <g transform="translate(150,168) rotate(-8)">
+            <rect x="0" y="0" width="90" height="34" rx="3" fill="#1F5C45"/>
+            <path d="M0 0 90 0 M0 11 90 11 M0 22 90 22 M0 33 90 33 M22 0 22 34 M45 0 45 34 M67 0 67 34" stroke="#57C785" stroke-width="1" opacity=".6"/>
+          </g>
+          <g transform="translate(210,148)">
+            <path d="M0 42C0 20 10 4 22 4c8 0 12 8 12 8s6-14 20-14 22 12 22 26c0 14-12 22-38 22-16 0-38-3-38-3z" fill="#1F5C45"/>
+            <path d="M22 42V16M22 24l-10-7M22 20l12-9M22 30l14 4" stroke="#57C785" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="12" cy="17" r="2.4" fill="#F2B441"/>
+            <circle cx="34" cy="11" r="2.4" fill="#F2B441"/>
+            <circle cx="36" cy="34" r="2.4" fill="#F2B441"/>
+          </g>
+          <g stroke="#1F5C45" stroke-width="1" opacity=".5">
+            <path d="M64 60 L150 40 M150 40 L300 66 M300 66 L360 30"/>
+          </g>
+          <circle class="svg-node" cx="150" cy="40" r="3" fill="#F2B441"/>
+          <circle class="svg-node" cx="360" cy="30" r="3" fill="#57C785"/>
+        </svg>
+      </div>
+    <div class="scroll">
+      <div class="lead-hero">
+        <div class="cup">🏆</div>
+        <h1>Rankings Preview</h1>
+      </div>
+      <div class="period-tabs">
+        <button class="period-pill active" data-period="daily">Daily</button>
+        <button class="period-pill" data-period="weekly">Weekly</button>
+        <button class="period-pill" data-period="alltime">All-Time</button>
+      </div>
+      <ul class="lead-list" id="leaderList"></ul>
+      <li class="lead-row my-rank-row" id="myRankRow" hidden style="list-style:none;"></li>
+    </div>
+  </section>
+
+  <!-- ============ PROFILE TAB ============ -->
+  <section class="screen profile-screen" data-tab="profile" hidden>
+      <div class="tech-illustration parallax-layer" style="--depth:10;" aria-hidden="true">
+        <svg viewBox="0 0 400 220" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0 190c40-22 90-30 130-14 46 18 80-6 130 4 44 9 80 26 140 10v30H0z" fill="#1F5C45"/>
+          <path d="M0 205c60-14 120-8 170 2 60 12 130-4 230 8v5H0z" fill="#57C785" opacity=".55"/>
+          <g transform="translate(64,150)">
+            <line x1="0" y1="0" x2="0" y2="-96" stroke="#1F5C45" stroke-width="4"/>
+            <circle cx="0" cy="-96" r="4" fill="#0E2A20"/>
+            <g class="svg-blades" transform="translate(0,-96)">
+              <path d="M0 0 L4 -34 A5 5 0 0 1 -4 -34 Z" fill="#1F5C45"/>
+              <path d="M0 0 L30 18 A5 5 0 0 1 26 26 Z" fill="#1F5C45"/>
+              <path d="M0 0 L-30 18 A5 5 0 0 1 -26 26 Z" fill="#1F5C45"/>
+            </g>
+          </g>
+          <g transform="translate(300,138)">
+            <line x1="0" y1="0" x2="0" y2="-72" stroke="#1F5C45" stroke-width="3"/>
+            <circle cx="0" cy="-72" r="3" fill="#0E2A20"/>
+            <g class="svg-blades slow" transform="translate(0,-72)">
+              <path d="M0 0 L3 -26 A4 4 0 0 1 -3 -26 Z" fill="#1F5C45"/>
+              <path d="M0 0 L22 13 A4 4 0 0 1 19 19 Z" fill="#1F5C45"/>
+              <path d="M0 0 L-22 13 A4 4 0 0 1 -19 19 Z" fill="#1F5C45"/>
+            </g>
+          </g>
+          <g transform="translate(150,168) rotate(-8)">
+            <rect x="0" y="0" width="90" height="34" rx="3" fill="#1F5C45"/>
+            <path d="M0 0 90 0 M0 11 90 11 M0 22 90 22 M0 33 90 33 M22 0 22 34 M45 0 45 34 M67 0 67 34" stroke="#57C785" stroke-width="1" opacity=".6"/>
+          </g>
+          <g transform="translate(210,148)">
+            <path d="M0 42C0 20 10 4 22 4c8 0 12 8 12 8s6-14 20-14 22 12 22 26c0 14-12 22-38 22-16 0-38-3-38-3z" fill="#1F5C45"/>
+            <path d="M22 42V16M22 24l-10-7M22 20l12-9M22 30l14 4" stroke="#57C785" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="12" cy="17" r="2.4" fill="#F2B441"/>
+            <circle cx="34" cy="11" r="2.4" fill="#F2B441"/>
+            <circle cx="36" cy="34" r="2.4" fill="#F2B441"/>
+          </g>
+          <g stroke="#1F5C45" stroke-width="1" opacity=".5">
+            <path d="M64 60 L150 40 M150 40 L300 66 M300 66 L360 30"/>
+          </g>
+          <circle class="svg-node" cx="150" cy="40" r="3" fill="#F2B441"/>
+          <circle class="svg-node" cx="360" cy="30" r="3" fill="#57C785"/>
+        </svg>
+      </div>
+    <div class="scroll">
+      <div class="profile-hero">
+        <div class="avatar" id="profAvatar">🌱</div>
+        <h1 id="profName">Nasif</h1>
+        <div class="uname" id="profUsername">@Nasif0011</div>
+        <div class="profile-contact" id="profContacts" style="margin-top:8px;font-size:.88rem;color:var(--muted);"></div>
+        <div class="tagline" id="profTagline">Turning small taps into big impact 🌍</div>
+        <div class="tier-badge" id="profTierBadge">🛡️ Beginner</div><br>
+        <button class="edit-profile-btn" id="editProfileBtn">✏️ Edit Profile</button>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><b id="profTotalScore">0</b><span>Total Eco Score</span></div>
+        <div class="stat-card"><b id="profDailyScore">0</b><span>Daily Score</span></div>
+        <div class="stat-card"><b id="profWeeklyScore">0</b><span>Weekly Score</span></div>
+        <div class="stat-card"><b id="profGames">0</b><span>Games Played</span></div>
+        <div class="stat-card"><b id="profBestLevel">1</b><span>Best Level</span></div>
+        <div class="stat-card"><b id="profStreak">1</b><span>Day Streak</span></div>
+      </div>
+      <div class="settings-block">
+        <h3>Settings</h3>
+        <div class="setting-row">
+          <span>Sound Effects</span>
+          <button class="toggle on" id="soundToggle" role="switch" aria-checked="true"></button>
+        </div>
+        <div class="setting-row">
+          <span>Language</span>
+          <div class="lang-pills">
+            <button class="lang-pill active" data-lang="en">EN</button>
+            <button class="lang-pill" data-lang="am">አማ</button>
+          </div>
+        </div>
+        <div class="setting-row" id="howToPlayRow" style="cursor:pointer;">
+          <span>How to Play</span>
+          <span style="opacity:.5;">›</span>
+        </div>
+        <label class="setting-row" for="profileLeaderboardConsent"><span>Show me in public leaderboards</span><input type="checkbox" id="profileLeaderboardConsent" style="width:20px;height:20px;"></label>
+        <button class="btn btn-secondary" id="playerSignOutBtn" type="button" style="margin-top:10px;">Sign Out</button>
+        <button class="btn btn-ghost" id="deleteAccountBtn" type="button" style="margin-top:8px;color:#9b3329;">Delete Account and Score Data</button>
+      </div>
+      <div class="announcements-block" id="announcementsBlock" hidden>
+        <h3>📣 Announcements</h3>
+        <div id="announcementsList"></div>
+      </div>
+      <div class="about-block">
+        <h3>About</h3>
+        <div class="card-text">Climate Game turns everyday eco-choices into a fast, tappable challenge. An initiative led by <b id="aboutCredit">Nasif</b>, Climate Advocate.</div>
+      </div>
+      <div class="about-block">
+        <h3>Learn more</h3>
+        <div class="card-text">The game is an educational analogy, not a measurement of your real-world emissions. Explore the evidence and actions behind the themes:<br><br>
+          <a href="https://science.nasa.gov/climate-change/evidence/" target="_blank" rel="noopener noreferrer">NASA — evidence for climate change</a><br>
+          <a href="https://www.epa.gov/recycle/recycling-basics-and-benefits" target="_blank" rel="noopener noreferrer">U.S. EPA — recycling basics and benefits</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BOTTOM NAV ============ -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="game">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+      Game
+    </button>
+    <button class="nav-btn" data-tab="updates">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M7 9h10"/><path d="M5 13h14"/><path d="M8 17h8"/></svg>
+      Updates
+    </button>
+    <button class="nav-btn" data-tab="invite">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2c2.6.4 4.5 2.6 4.5 5.3"/></svg>
+      Invite
+    </button>
+    <button class="nav-btn" data-tab="leaderboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M12 14v3"/><path d="M9 20h6"/><path d="M10 17h4v3h-4z"/></svg>
+      Leaders
+    </button>
+    <button class="nav-btn" data-tab="profile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+      Profile
+    </button>
+  </nav>
+
+  <!-- ============ LEGEND MODAL (global) ============ -->
+  <div class="legend-overlay" id="legendOverlay" hidden>
+    <div class="legend-sheet">
+      <button class="legend-sheet-close" id="legendCloseX" type="button" aria-label="Close">×</button>
+      <h2>How to Play</h2>
+      <p class="sub">Every falling item has a colored ring — tap fast, tap smart.</p>
+      <div class="legend-key">
+        <span><span class="swatch good"></span>Safe — tap for points</span>
+        <span><span class="swatch bad"></span>Hazard — avoid it</span>
+      </div>
+      <div class="legend-grid" id="legendGrid"></div>
+      <button class="btn btn-secondary" id="legendCloseBtn" style="margin-top:18px;">Got it</button>
+    </div>
+  </div>
+
+  <!-- ============ EDIT PROFILE MODAL (global) ============ -->
+  <div class="legend-overlay" id="editProfileOverlay" hidden>
+    <div class="legend-sheet">
+      <h2>Edit Profile</h2>
+      <p class="sub">Your display name and score sync with your account. Avatar, tagline, and sound settings are saved in this browser.</p>
+      <div class="field">
+        <label>Display Name</label>
+        <input type="text" id="editNameInput" maxlength="24" placeholder="Your name">
+      </div>
+      <div class="field">
+        <label>Tagline</label>
+        <textarea id="editTaglineInput" rows="2" maxlength="60" placeholder="A short line about you"></textarea>
+      </div>
+      <div class="field">
+        <label>Profile Photo</label>
+        <div class="avatar-upload-row">
+          <div class="avatar-upload-preview" id="avatarUploadPreview">🌱</div>
+          <div class="avatar-upload-actions">
+            <button type="button" class="btn btn-secondary" id="uploadPhotoBtn" style="width:auto;padding:10px 16px;">Choose from device</button>
+            <button type="button" class="btn btn-ghost" id="removePhotoBtn" style="width:auto;" hidden>Remove photo</button>
+          </div>
+          <input type="file" id="avatarFileInput" accept="image/*" hidden>
+        </div>
+      </div>
+      <div class="field">
+        <label>Avatar Icon <span style="text-transform:none;font-weight:400;opacity:.7;">(used when no photo is set)</span></label>
+        <div class="emoji-grid" id="emojiGrid"></div>
+      </div>
+      <div class="field">
+        <label>Avatar Color</label>
+        <div class="color-grid" id="colorGrid"></div>
+      </div>
+      <button class="btn btn-primary" id="saveProfileBtn">Save Changes</button>
+      <button class="btn btn-secondary" id="cancelProfileBtn" style="margin-top:10px;">Cancel</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toastEl"></div>
+
+</div></div>
+
+<script src="scripts/env-config.js"></script>
+<script src="storage-bridge.js"></script>
+<script src="telegram-integration.js"></script>
+<script src="server-connection.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- data ---------------- */
+  const CATALOG = [
+    {id:'tree',    emoji:'🌳', good:true,  pts:10, hp:0, w:3,   label:'Plant a tree'},
+    {id:'water',   emoji:'💧', good:true,  pts:10, hp:0, w:3,   label:'Save water'},
+    {id:'recycle', emoji:'♻️', good:true,  pts:15, hp:0, w:2,   label:'Recycle right'},
+    {id:'bus',     emoji:'🚌', good:true,  pts:10, hp:0, w:2,   label:'Take transit'},
+    {id:'bike',    emoji:'🚲', good:true,  pts:10, hp:0, w:2,   label:'Ride a bike'},
+    {id:'basket',  emoji:'🧺', good:true,  pts:10, hp:0, w:2,   label:"Reuse, don't waste"},
+    {id:'clover',  emoji:'🍀', good:true,  pts:25, hp:0, w:1,   label:'Lucky bonus'},
+    {id:'shield',  emoji:'🛡️', good:true,  pts:5,  hp:0, w:.7,  label:'5s hazard shield', power:'shield'},
+    {id:'factory', emoji:'🏭', good:false, pts:-15,hp:-8, w:2,  label:'Factory smoke'},
+    {id:'fire',    emoji:'🔥', good:false, pts:-15,hp:-8, w:2,  label:'Wildfire'},
+    {id:'plane',   emoji:'✈️', good:false, pts:-10,hp:-5, w:2,  label:'Flight emissions'},
+    {id:'plastic', emoji:'🛍️', good:false, pts:-10,hp:-5, w:2,  label:'Single-use plastic'},
+    {id:'oil',     emoji:'🛢️', good:false, pts:-10,hp:-5, w:1.5,label:'Oil spill'},
+  ];
+
+  const FACTS = [
+    "NASA: Human activity is the principal cause of current global warming.",
+    "NASA: Current warming is happening at a rate not seen in the past 10,000 years.",
+    "NASA: The ocean absorbs most of the extra heat stored in Earth's climate system.",
+    "U.S. EPA: Reducing and reusing are preferred over recycling in the waste-management hierarchy.",
+    "U.S. EPA: Recycling can conserve natural resources and energy and reduce waste sent to landfills.",
+  ];
+
+  const TIERS = [
+    {min:0,    name:'Beginner',       icon:'🛡️'},
+    {min:200,  name:'Eco Aware',      icon:'🌱'},
+    {min:600,  name:'Eco Warrior',    icon:'🌿'},
+    {min:1500, name:'Planet Guardian',icon:'🌍'},
+    {min:3500, name:'Climate Hero',   icon:'🏆'},
+  ];
+
+  const ONBOARD = [
+    {icon:'🌱', title:'Small taps, real impact', body:'Catch eco-friendly actions before they fall past you — every tap represents a real climate-smart choice.'},
+    {icon:'🌍', title:'The world reacts to you', body:'Planet Health rises with good choices and fades when pollution wins. Watch the skyline shift color as you play.'},
+    {icon:'🏆', title:'Practice climate-smart choices', body:'Earn a personal Eco-Score, explore climate learning resources, and practice making thoughtful choices.'},
+  ];
+  let appBrandName = 'Climate Game';
+  let appCreditName = 'Climate Advocate';
+
+  let competitionUnavailable = true;
+
+  function sanitizeReferralCode(value){
+    return String(value||'').trim().replace(/^@/,'').replace(/[^a-zA-Z0-9_\-]+/g,'').toLowerCase();
+  }
+  function ensureProfileReferralCode(){
+    if(!profile.referralCode){
+      const suggested = sanitizeReferralCode(profile.username || profile.regValue || profile.name || profile.id || 'player');
+      profile.referralCode = suggested || 'player';
+    }
+    return profile.referralCode;
+  }
+  function getReferralTargetBase(){
+    try{
+      const params = new URLSearchParams(window.location.search);
+      const explicitMode = (params.get('refMode') || localStorage.getItem('climateGameReferralMode_v1') || '').toLowerCase();
+      const explicitHost = params.get('refHost') || params.get('gameUrl') || params.get('hostUrl') || localStorage.getItem('climateGameReferralHost_v1') || '';
+      const botUsername = params.get('bot') || params.get('telegramBot') || localStorage.getItem('climateGameReferralBot_v1') || 'ClimateGameBot';
+      const hasTelegramWebApp = !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe);
+      if(explicitMode === 'telegram') return `https://t.me/${botUsername}`;
+      if(explicitMode === 'web' && explicitHost) return explicitHost;
+      if(hasTelegramWebApp) return `https://t.me/${botUsername}`;
+      if(window.location.protocol === 'https:' || window.location.protocol === 'http:'){
+        const url = new URL(window.location.href);
+        url.search = '';
+        url.hash = '';
+        return url.toString();
+      }
+      if(explicitHost) return explicitHost;
+      return `https://t.me/${botUsername}`;
+    }catch(e){
+      return 'https://t.me/ClimateGameBot';
+    }
+  }
+  function buildReferralLink(){
+    const code = ensureProfileReferralCode();
+    const base = getReferralTargetBase();
+    const normalizedBase = String(base||'').trim();
+    if(/^https?:\/\/t\.me\//i.test(normalizedBase)){
+      return `${normalizedBase}${normalizedBase.includes('?') ? '&' : '?'}start=${encodeURIComponent(code)}`;
+    }
+    try{
+      const url = new URL(normalizedBase);
+      if(url.protocol === 'http:' || url.protocol === 'https:'){
+        url.searchParams.set('ref', code);
+        return url.toString();
+      }
+    }catch(e){}
+    if(normalizedBase){
+      const separator = normalizedBase.includes('?') ? '&' : '?';
+      return `${normalizedBase}${separator}ref=${encodeURIComponent(code)}`;
+    }
+    return `https://t.me/ClimateGameBot?start=${encodeURIComponent(code)}`;
+  }
+  function getReferralCodeFromUrl(){
+    try{
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get('start') || params.get('ref') || '';
+      return sanitizeReferralCode(raw);
+    }catch(e){ return ''; }
+  }
+  function findReferrerByCode(code){
+    try{
+      const rawPlayers = localStorage.getItem(PLAYERS_KEY);
+      const list = rawPlayers ? JSON.parse(rawPlayers) : [];
+      const normalized = sanitizeReferralCode(code);
+      if(!normalized) return null;
+      return list.find(p => {
+        const candidate = sanitizeReferralCode(p.referralCode || p.username || p.id || '');
+        const usernameCode = sanitizeReferralCode((p.username||'').replace(/^@/,''));
+        return candidate === normalized || usernameCode === normalized;
+      }) || null;
+    }catch(e){ return null; }
+  }
+  function syncProfileFromAdminRoster(){
+    try{
+      const rawPlayers = localStorage.getItem(PLAYERS_KEY);
+      if(!rawPlayers) return false;
+      const list = JSON.parse(rawPlayers);
+      if(!Array.isArray(list)) return false;
+      const match = list.find(p => {
+        if(!p) return false;
+        if(profile.id && p.id && p.id === profile.id) return true;
+        const pUsername = (p.username||'').replace(/^@/,'').toLowerCase();
+        const profileUsername = (profile.username||profile.regValue||'').replace(/^@/,'').toLowerCase();
+        const pPhone = (p.contactPhone||'').replace(/\s+/g,'').toLowerCase();
+        const profilePhone = (profile.contactPhone||profile.regValue||'').replace(/\s+/g,'').toLowerCase();
+        const pTelegram = (p.contactTelegram||'').replace(/^@/,'').toLowerCase();
+        const profileTelegram = (profile.contactTelegram||profile.regValue||'').replace(/^@/,'').toLowerCase();
+        return (profileUsername && pUsername === profileUsername) || (profilePhone && pPhone === profilePhone) || (profileTelegram && pTelegram === profileTelegram);
+      });
+      if(!match) return false;
+      profile.referrals = Number(match.referrals)||profile.referrals;
+      profile.referralCode = match.referralCode || profile.referralCode || ensureProfileReferralCode();
+      profile.referrer = match.referrer || profile.referrer || '';
+      if(!profile.name || profile.name === 'Player') profile.name = match.name || profile.name;
+      if(!profile.username) profile.username = match.username || profile.username;
+      if(!profile.contactPhone) profile.contactPhone = match.contactPhone || profile.contactPhone;
+      if(!profile.contactTelegram) profile.contactTelegram = match.contactTelegram || profile.contactTelegram;
+      savePlayerData();
+      return true;
+    }catch(e){ return false; }
+  }
+  function applyReferralForNewPlayer(){
+    const code = getReferralCodeFromUrl();
+    if(!code || !profile.id) return null;
+    const normalizedCode = sanitizeReferralCode(code);
+    if(!normalizedCode) return null;
+    const selfCode = sanitizeReferralCode(profile.referralCode || profile.username || profile.regValue || profile.id || '');
+    if(selfCode && normalizedCode === selfCode) return null;
+    const referrer = findReferrerByCode(normalizedCode);
+    if(!referrer) return null;
+    if(profile.referrer && profile.referrer === (referrer.username || referrer.id)) return null;
+    // Referral rewards need trusted cross-player identity and are intentionally
+    // disabled while this build stores progress only on the current device.
+    return null;
+  }
+
+  // Two photographic scenes (day/"growth" art + night/"circuit" art) alternate level to level
+  // so the backdrop feels like a living, changing world instead of one static picture. Planet
+  // Health still grades the mood on top of whichever photo is active (see applyHealthGrading).
+  const THEME = {
+    label:'Climate Tech Initiative',
+  };
+
+  // The full "difficulty algorithm" — every number the game balance depends on lives here,
+  // in one place, so the admin dashboard's Levels & Difficulty screen edits exactly this shape.
+  // Levels ramp from simple → hard: level 1 has no hazards at all (just tap the good items to
+  // reach the Eco-Score goal); hazards phase in over the next few levels; storms start later.
+  const DIFFICULTY = {
+    targetBase:100, targetStep:50, durationSeconds:30,
+    spawnIntervalBaseMs:900, spawnIntervalMinMs:300, spawnIntervalStepMs:48,
+    itemSpeedBase:28, itemSpeedPerLevel:5,
+    hazardRampLevels:4,                     // level1: 0% hazards -> level4+: 100% hazards
+    stormStartLevel:4, stormEveryNLevels:2, stormGoodMult:.4, stormBadMult:3.6,
+    levelUpBonus:25,                        // bonus points for completing a level
+  };
+
+  const AVATAR_EMOJIS = ['🌱','🌍','🌳','💧','♻️','🌿','🦋','🌤️'];
+  const AVATAR_COLORS = [
+    'linear-gradient(135deg,#57C785,#1F5C45)',
+    'linear-gradient(135deg,#F2B441,#E4573F)',
+    'linear-gradient(135deg,#57C785,#F2B441)',
+    'linear-gradient(135deg,#8C7B6B,#1F5C45)',
+  ];
+
+  /* ---------------- state ---------------- */
+  const state = {
+    tab:'game', screen:'splash', onboardStep:0,
+    level:1, target:100, duration:30,
+    elapsed:0, sinceSpawn:0, timeLeftDisplay:30,
+    score:0, scoreAtLevelStart:0, levelStartAt:0, health:100, maxHealth:100,
+    combo:0, shieldUntil:0, isStorm:false,
+    items:[], lastTs:0, leaderboardPeriod:'daily',
+    settings:{sound:true, lang:'en'},
+    theme:THEME, scoreLog:[], levelUpPoints:0,
+  };
+  // Account name, consent, and scores hydrate from /api/account. Avatar/tagline
+  // remain device-local cosmetic preferences and are not sent to the server.
+  const profile = {
+    name:'Player', username:'', tagline:'Turning small taps into big impact 🌍',
+    avatarEmoji:'🌱', avatarColorIdx:0, avatarPhoto:null,
+    gamesPlayed:0, bestLevel:1, referrals:0, streak:1,
+    contactEmail:'', contactPhone:'', contactTelegram:'',
+    referralCode:'', referrer:'', referralBonusEarned:0,
+    leaderboardOptIn:false, regMethod:null, regValue:null, id:null,
+  };
+  let accountAuthenticated = false;
+  let currentRunId = null;
+  let currentRunFinish = Promise.resolve();
+  let serverPeriods = {daily:0, weekly:0};
+  let rafId = null, itemSeq = 0, actx = null;
+
+    /* ---------------- local cosmetic preference cache ----------------
+      Authentication and score history are server-managed. This cache is only
+      for optional per-device avatar/tagline settings. */
+  const PLAYER_KEY = 'climateGamePlayer_v1';
+  function loadPlayerData(){
+    try{
+      const raw = localStorage.getItem(PLAYER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function savePlayerData(){
+    try{
+      localStorage.setItem(PLAYER_KEY, JSON.stringify({
+        id:profile.id,
+        regMethod:profile.regMethod, regValue:profile.regValue,
+        name:profile.name, username:profile.username, tagline:profile.tagline,
+        avatarEmoji:profile.avatarEmoji, avatarColorIdx:profile.avatarColorIdx, avatarPhoto:profile.avatarPhoto,
+        gamesPlayed:profile.gamesPlayed, bestLevel:profile.bestLevel,
+        referrals:profile.referrals, streak:profile.streak,
+        contactEmail:profile.contactEmail, contactPhone:profile.contactPhone, contactTelegram:profile.contactTelegram,
+        referralCode:profile.referralCode, referrer:profile.referrer, referralBonusEarned:profile.referralBonusEarned,
+        score:state.score, // level is intentionally NOT persisted for resume — every
+        // session always restarts at Level 1 while the Eco-Score keeps accumulating.
+        scoreLog:state.scoreLog,
+      }));
+    }catch(e){ /* local cosmetic cache is optional */ }
+  }
+  function waitForStorageBridge(){
+    if(!window.StorageBridge || window.StorageBridge.ready()) return Promise.resolve();
+    return new Promise(resolve=>window.StorageBridge.onReady(resolve));
+  }
+  async function requestPlayerApi(path, options={}){
+    const client = window.StorageBridge && window.StorageBridge.getClient();
+    const {data:{session}} = client ? await client.auth.getSession() : {data:{session:null}};
+    if(!session?.access_token) throw new Error('Sign in to continue.');
+    const response = await fetch(path, {
+      ...options,
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,...(options.headers||{})},
+    });
+    const data = await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(data.message || 'Could not reach the multiplayer service.');
+    return data;
+  }
+  async function restorePlayerAccount(){
+    await waitForStorageBridge();
+    const client = window.StorageBridge && window.StorageBridge.getClient();
+    if(!client){ accountAuthenticated = false; return false; }
+    const {data:{session}, error} = await client.auth.getSession();
+    if(error || !session){ accountAuthenticated = false; return false; }
+    try{
+      const account = await requestPlayerApi('/api/account');
+      const savedData = loadPlayerData();
+      const saved = savedData && String(savedData.id) === String(account.id) ? savedData : {};
+      accountAuthenticated = true;
+      profile.id = account.id;
+      profile.name = account.name || 'Eco Player';
+      profile.username = '';
+      profile.regMethod = 'account';
+      profile.regValue = '';
+      profile.tagline = saved.tagline || profile.tagline;
+      profile.avatarEmoji = saved.avatarEmoji || profile.avatarEmoji;
+      profile.avatarColorIdx = Number(saved.avatarColorIdx) || 0;
+      profile.avatarPhoto = saved.avatarPhoto || null;
+      profile.gamesPlayed = Number(account.gamesPlayed) || 0;
+      profile.bestLevel = Number(account.bestLevel) || 1;
+      profile.leaderboardOptIn = Boolean(account.leaderboardOptIn);
+      state.score = Number(account.score) || 0;
+      serverPeriods = {daily:Number(account.dailyScore)||0, weekly:Number(account.weeklyScore)||0};
+      state.scoreLog = [];
+      updateHUD();
+      renderProfile();
+      savePlayerData();
+      return true;
+    }catch(e){
+      console.error('[account] failed to load player profile', e);
+      toast(e.message || 'Could not load your player account.');
+      accountAuthenticated = false;
+      return false;
+    }
+  }
+  async function startServerRun(){
+    await currentRunFinish;
+    const run = await requestPlayerApi('/api/game/start', {
+      method:'POST',
+      body:JSON.stringify({level:state.level,target:state.target}),
+    });
+    currentRunId = run.runId;
+  }
+  async function finishServerRun(result){
+    if(!currentRunId) return;
+    const runId = currentRunId;
+    currentRunId = null;
+    try{
+      const account = await requestPlayerApi('/api/game/finish', {
+        method:'POST',
+        body:JSON.stringify({
+          runId,
+          delta:Math.round(state.score-state.scoreAtLevelStart),
+          level:state.level,
+          elapsedSeconds:Math.max(0,Math.floor(state.elapsed/1000)),
+          result,
+        }),
+      });
+      state.score = Number(account.score) || 0;
+      profile.gamesPlayed = Number(account.gamesPlayed) || profile.gamesPlayed;
+      profile.bestLevel = Number(account.bestLevel) || profile.bestLevel;
+      serverPeriods = {daily:Number(account.dailyScore)||0, weekly:Number(account.weeklyScore)||0};
+      renderProfile();
+      savePlayerData();
+      updateHUD();
+    }catch(e){
+      console.error('[score] result was not accepted', e);
+      toast('Score did not sync: '+(e.message || 'try signing in again'));
+      await restorePlayerAccount();
+    }
+  }
+  function hydrateProfileFromSavedData(saved){
+    Object.assign(profile, {
+      id:saved.id||null,
+      regMethod:saved.regMethod, regValue:saved.regValue, name:saved.name||profile.name,
+      username:saved.username||profile.username, tagline:saved.tagline||profile.tagline,
+      avatarEmoji:saved.avatarEmoji||profile.avatarEmoji, avatarColorIdx:saved.avatarColorIdx||0,
+      avatarPhoto:saved.avatarPhoto||null,
+      gamesPlayed:saved.gamesPlayed||0, bestLevel:saved.bestLevel||1,
+      referrals:saved.referrals||0, streak:saved.streak||1,
+      contactEmail:saved.contactEmail||'', contactPhone:saved.contactPhone||'', contactTelegram:saved.contactTelegram||'',
+      referralCode:saved.referralCode||'', referrer:saved.referrer||'', referralBonusEarned:saved.referralBonusEarned||0,
+    });
+    state.score = saved.score||0;
+    state.scoreLog = saved.scoreLog||[];
+    renderProfile();
+    syncLive();
+    return true;
+  }
+  function normalizeIdentity(value){
+    return String(value||'').trim().replace(/^@/, '').toLowerCase();
+  }
+  function findRosterEntryForIdentity(method, value, fallbackId){
+    try{
+      const raw = localStorage.getItem(PLAYERS_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      const normalizedValue = method === 'telegram' ? normalizeIdentity(value) : String(value||'').replace(/\s+/g,'').toLowerCase();
+      const fallback = fallbackId ? String(fallbackId).toLowerCase() : '';
+      return list.find(entry => {
+        if(!entry) return false;
+        if(fallback && entry.id && String(entry.id).toLowerCase() === fallback) return true;
+        const entryUsername = normalizeIdentity(entry.username || entry.contactTelegram || entry.name || '');
+        const entryPhone = String(entry.contactPhone || '').replace(/\s+/g,'').toLowerCase();
+        const entryTelegram = normalizeIdentity(entry.contactTelegram || '');
+        if(method === 'telegram'){
+          return entryUsername === normalizedValue || entryTelegram === normalizedValue || normalizeIdentity(entry.name || '') === normalizedValue;
+        }
+        return entryPhone === normalizedValue || entryUsername === normalizedValue || normalizeIdentity(entry.name || '') === normalizedValue;
+      }) || null;
+    }catch(e){ return null; }
+  }
+  function applyRosterProfile(entry){
+    if(!entry) return false;
+    const inferredMethod = entry.contactTelegram ? 'telegram' : (entry.contactPhone ? 'phone' : 'telegram');
+    profile.id = entry.id || profile.id || null;
+    profile.regMethod = inferredMethod;
+    profile.regValue = inferredMethod === 'telegram' ? (entry.contactTelegram || entry.username || '') : (entry.contactPhone || '');
+    profile.name = entry.name || profile.name || 'Player';
+    profile.username = entry.username || (inferredMethod === 'telegram' ? entry.contactTelegram || '' : '');
+    profile.contactEmail = entry.contactEmail || '';
+    profile.contactPhone = entry.contactPhone || '';
+    profile.contactTelegram = entry.contactTelegram || '';
+    profile.referralCode = entry.referralCode || profile.referralCode || '';
+    profile.referrer = entry.referrer || profile.referrer || '';
+    profile.referrals = Number(entry.referrals) || 0;
+    profile.bestLevel = Number(entry.bestLevel) || profile.bestLevel;
+    profile.avatarEmoji = entry.avatarEmoji || profile.avatarEmoji;
+    savePlayerData();
+    syncLive();
+    renderProfile();
+    return true;
+  }
+  function autoRegisterCurrentPlayer(){
+    const saved = loadPlayerData();
+    if(saved && saved.regMethod){
+      hydrateProfileFromSavedData(saved);
+      return true;
+    }
+
+    const telegram = window.TelegramPlayer;
+    if(telegram && telegram.username){
+      const rosterMatch = findRosterEntryForIdentity('telegram', telegram.username, telegram.id);
+      if(rosterMatch){
+        return applyRosterProfile(rosterMatch);
+      }
+      ensureProfileId();
+      const username = '@' + String(telegram.username).replace(/^@/, '');
+      profile.regMethod = 'telegram';
+      profile.regValue = username;
+      profile.name = telegram.name || telegram.username || 'Player';
+      profile.username = username;
+      profile.contactTelegram = username;
+      if(telegram.id) profile.id = String(telegram.id);
+      addToAdminRoster();
+      savePlayerData();
+      syncLive();
+      renderProfile();
+      return true;
+    }
+
+    return false;
+  }
+  function clearLocalProfile(){
+    try{ localStorage.removeItem(PLAYER_KEY); }catch(e){ }
+    cancelAnimationFrame(rafId);
+    profile.id = null; profile.regMethod = null; profile.regValue = null;
+    profile.name = 'Player'; profile.username = ''; profile.tagline = 'Turning small taps into big impact 🌍';
+    profile.avatarEmoji = '🌱'; profile.avatarColorIdx = 0; profile.avatarPhoto = null;
+    profile.gamesPlayed = 0; profile.bestLevel = 1; profile.referrals = 0; profile.streak = 1;
+    profile.contactEmail = ''; profile.contactPhone = ''; profile.contactTelegram = '';
+    profile.referralCode = ''; profile.referrer = ''; profile.referralBonusEarned = 0;
+    state.score = 0; state.level = 1; state.scoreLog = []; state.health = 100; state.combo = 0;
+    rollbackCurrentLevelScoreLog();
+    state.screen = 'register'; registerScreen.hidden = false; playArea.hidden = true;
+  }
+
+    /* ---------------- local preference save hook ----------------
+      Competitive totals are written only by finishServerRun(); this hook does
+      not publish player state through browser storage. */
+  const LIVE_KEY = 'climateGameLive_v1';
+  const PLAYERS_KEY = 'climateGameAdminPlayers_v1';
+  const ADMIN_COMMAND_KEY = 'climateGameAdminCommands_v1';
+  const REMOVED_PLAYERS_KEY = 'climateGameAdminRemovedPlayers_v1';
+  function ensureProfileId(){
+    // Prefer the verified Telegram identity so the same person always maps
+    // to the same player id across devices/sessions, instead of a random
+    // per-device id. Falls back to a random device id outside Telegram.
+    if(window.TelegramPlayer && window.TelegramPlayer.id){
+      profile.id = window.TelegramPlayer.id;
+      if(!profile.name || profile.name === 'Player') profile.name = window.TelegramPlayer.name || profile.name;
+      return;
+    }
+    if(!profile.id) profile.id = 'p_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);
+  }
+  function loadRemovedPlayers(){
+    try{
+      const raw = localStorage.getItem(REMOVED_PLAYERS_KEY);
+      if(!raw) return {ids:new Set(), usernames:new Set(), liveIds:new Set()};
+      const saved = JSON.parse(raw);
+      const ids = new Set(Array.isArray(saved.ids) ? saved.ids : []);
+      const liveIds = new Set(Array.isArray(saved.liveIds) ? saved.liveIds : []);
+      const usernames = new Set((Array.isArray(saved.usernames) ? saved.usernames : []).map(u=>String(u||'').replace(/^@/,'').trim().toLowerCase()).filter(Boolean));
+      return {ids, usernames, liveIds};
+    }catch(e){ return {ids:new Set(), usernames:new Set(), liveIds:new Set()}; }
+  }
+  function isRemovedProfile(removed){
+    if(!removed) return false;
+    const id = profile.id || '';
+    const username = (profile.username||profile.regValue||profile.name||'').replace(/^@/,'').trim().toLowerCase();
+    return (id && removed.ids.has(id)) || (id && removed.liveIds.has(id)) || (username && removed.usernames.has(username));
+  }
+  function pushScoreLog(delta){
+    const now = Date.now();
+    state.scoreLog.push({t:now, d:delta});
+    const cutoff = now - 8*24*60*60*1000; // keep ~8 days of history, enough for daily/weekly
+    while(state.scoreLog.length && state.scoreLog[0].t < cutoff) state.scoreLog.shift();
+    if(state.scoreLog.length > 400) state.scoreLog.splice(0, state.scoreLog.length-400);
+  }
+  function rollbackCurrentLevelScoreLog(){
+    if(!state.levelStartAt) return;
+    state.scoreLog = state.scoreLog.filter(entry => entry.t < state.levelStartAt);
+  }
+  function computePeriodScores(){
+    const now = Date.now(), day = 24*60*60*1000;
+    let daily=0, weekly=0;
+    for(const e of state.scoreLog){
+      if(now-e.t <= day) daily += e.d;
+      if(now-e.t <= 7*day) weekly += e.d;
+    }
+    return {daily, weekly};
+  }
+  function applyAdminCommands(){
+    let raw;
+    try{ raw = localStorage.getItem(ADMIN_COMMAND_KEY); }catch(e){ return false; }
+    if(!raw) return false;
+    let commands; try{ commands = JSON.parse(raw); }catch(e){ return false; }
+    if(!Array.isArray(commands)) return false;
+    const normalizedUsername = (profile.username||profile.regValue||profile.name||'').replace(/^@/,'').toLowerCase();
+    const normalizedRegValue = (profile.regValue||'').toString().replace(/^@/,'').replace(/\s+/g,'').toLowerCase();
+    const normalizedPhone = (profile.contactPhone||'').toString().replace(/\s+/g,'').toLowerCase();
+    const normalizedTelegram = (profile.contactTelegram||'').replace(/^@/,'').toLowerCase();
+    let changed = false;
+    for(const cmd of commands){
+      if(!cmd || !cmd.id || cmd._applied) continue;
+      const matchesId = cmd.playerId && cmd.playerId === profile.id;
+      const matchesLiveId = cmd.liveId && cmd.liveId === profile.id;
+      const commandName = (cmd.username||cmd.name||'').replace(/^@/,'').toLowerCase();
+      const commandPhone = (cmd.contactPhone||'').toString().replace(/\s+/g,'').toLowerCase();
+      const commandTelegram = (cmd.contactTelegram||'').toString().replace(/^@/,'').toLowerCase();
+      const matchesName = commandName && (commandName === normalizedUsername || commandName === (profile.name||'').toLowerCase());
+      const matchesPhone = commandPhone && (commandPhone === normalizedRegValue || commandPhone === normalizedPhone);
+      const matchesTelegram = commandTelegram && (commandTelegram === normalizedRegValue || commandTelegram === normalizedTelegram);
+      if(!matchesId && !matchesLiveId && !matchesName && !matchesPhone && !matchesTelegram) continue;
+      if(cmd.type === 'reset'){
+        cancelAnimationFrame(rafId);
+        clearItems();
+        state.score = 0;
+        state.level = 1;
+        state.scoreLog = [];
+        state.scoreAtLevelStart = 0;
+        state.levelStartAt = Date.now();
+        state.health = 100;
+        state.combo = 0;
+        savePlayerData();
+        startLevelIntro(1);
+        cmd._applied = true;
+        changed = true;
+      } else if(cmd.type === 'clearProfile'){
+        // Force the preview to forget the current saved profile so the player
+        // must re-register. This is transient and does not persist a ban.
+        try{ localStorage.removeItem(PLAYER_KEY); }catch(_){ }
+        try{
+          const rawLive = localStorage.getItem(LIVE_KEY);
+          if(rawLive){
+            const allLive = JSON.parse(rawLive);
+            const normalizedUsername = (profile.username||'').replace(/^@/,'').trim().toLowerCase();
+            const normalizedName = (profile.name||'').trim().toLowerCase();
+            const normalizedRegValue = (profile.regValue||'').replace(/^@/,'').trim().toLowerCase();
+            Object.keys(allLive).forEach(liveKey => {
+              const live = allLive[liveKey];
+              const liveName = (live.username||'').replace(/^@/,'').trim().toLowerCase();
+              const plainName = (live.name||'').trim().toLowerCase();
+              if(liveKey === profile.id || liveKey === profile.regValue || liveName === normalizedUsername || plainName === normalizedName || liveName === normalizedRegValue || plainName === normalizedRegValue){
+                delete allLive[liveKey];
+              }
+            });
+            localStorage.setItem(LIVE_KEY, JSON.stringify(allLive));
+          }
+        }catch(_){ }
+        cancelAnimationFrame(rafId);
+        // reset in-memory profile and state related to the session
+        profile.id = null; profile.regMethod = null; profile.regValue = null;
+        profile.name = 'Player'; profile.username = ''; profile.tagline = 'Turning small taps into big impact 🌍';
+        profile.avatarEmoji = '🌱'; profile.avatarColorIdx = 0; profile.avatarPhoto = null;
+        profile.gamesPlayed = 0; profile.bestLevel = 1; profile.referrals = 0; profile.streak = 1;
+        profile.contactEmail = ''; profile.contactPhone = ''; profile.contactTelegram = '';
+        state.score = 0; state.level = 1; state.scoreLog = []; state.health = 100; state.combo = 0;
+        rollbackCurrentLevelScoreLog();
+        state.screen = 'register'; registerScreen.hidden = false; playArea.hidden = true;
+        cmd._applied = true;
+        changed = true;
+      }
+    }
+    if(changed){
+      try{ localStorage.setItem(ADMIN_COMMAND_KEY, JSON.stringify(commands)); }catch(e){}
+    }
+    return changed;
+  }
+  function ensureRosterEntry(){
+    if(!profile.regMethod || !profile.regValue) return;
+    if(isInAdminRoster()) return;
+    const removed = loadRemovedPlayers();
+    if(isRemovedProfile(removed)) return;
+    addToAdminRoster();
+  }
+
+  function syncLive(){
+    if(!accountAuthenticated) return;
+    savePlayerData();
+  }
+
+    /* ---------------- server-published public game config ----------------
+      Administrator settings are read from the protected API projection and
+      refreshed periodically so all player devices receive the same config. */
+  const CONFIG_KEY = 'climateGameConfig_v1';
+  let remoteConfig = null, maintenanceOn = false;
+  function loadConfig(){
+    try{ const raw = localStorage.getItem(CONFIG_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+  }
+  function applyRemoteConfig(cfg){
+    if(!cfg) return;
+    remoteConfig = cfg;
+    if(cfg.difficulty) Object.assign(DIFFICULTY, cfg.difficulty);
+    if(Array.isArray(cfg.items) && cfg.items.length){ CATALOG.length = 0; cfg.items.forEach(it=>CATALOG.push(it)); }
+    applyBrandingConfig(cfg.branding||{});
+    applyCustomBackgrounds(cfg.branding||{});
+    renderAnnouncements(Array.isArray(cfg.events) ? cfg.events : []);
+    applyMaintenance(!!(cfg.toggles && cfg.toggles.maintenance));
+  }
+  async function configTick(){
+    let cfg = loadConfig();
+    try{
+      const response = await fetch('/api/kv/'+encodeURIComponent(CONFIG_KEY), {cache:'no-store'});
+      if(response.ok){
+        const result = await response.json();
+        if(result && result.value) cfg = result.value;
+      }
+    }catch(e){ /* keep the last locally cached configuration while offline */ }
+    applyRemoteConfig(cfg);
+  }
+  window.addEventListener('storage', (e)=>{ if(e.key===CONFIG_KEY) configTick(); });
+  setInterval(configTick, 2500);
+
+  /* ---------------- maintenance mode ---------------- */
+  function applyMaintenance(on){
+    if(on === maintenanceOn) return;
+    maintenanceOn = on;
+    if(on){
+      cancelAnimationFrame(rafId);
+      maintenanceScreen.hidden = false;
+      if(state.screen==='playing' || state.screen==='paused'){ goScreen('onboarding'); }
+    } else {
+      maintenanceScreen.hidden = true;
+      // Resume a session that was frozen mid-play when maintenance switched on.
+      if(state.screen==='playing'){ state.lastTs = 0; rafId = requestAnimationFrame(frameLoop); }
+    }
+  }
+
+  function applyBrandingConfig(branding){
+    const name = branding.appName || appBrandName;
+    const credit = branding.creditName || appCreditName;
+    appBrandName = name;
+    appCreditName = credit;
+    document.title = name;
+    const splashTitleEl = $('splashTitle');
+    const splashSubtitleEl = $('splashSubtitle');
+    const registerTitleEl = $('registerTitle');
+    const registerSubtitleEl = $('registerSubtitle');
+    if(splashTitleEl){ splashTitleEl.textContent = name; }
+    if(splashSubtitleEl){ splashSubtitleEl.textContent = `Presents ${name} — part of the Climate Tech Initiative`; }
+    if(registerTitleEl){ registerTitleEl.textContent = `Join ${name}`; }
+    if(registerSubtitleEl){ registerSubtitleEl.textContent = `Choose a display name to play on this device. Avoid entering contact details; progress is not shared between devices.`; }
+    if(aboutCredit){ aboutCredit.textContent = credit; }
+    if(Array.isArray(branding.onboarding) && branding.onboarding.length){
+      ONBOARD.splice(0, ONBOARD.length, ...branding.onboarding.map(item=>({icon:item.icon||'🌍', title:item.title||'New challenge', body:item.body||''})));
+    }
+    if(Array.isArray(branding.facts) && branding.facts.length){
+      FACTS.splice(0, FACTS.length, ...branding.facts);
+    }
+    if(state.screen==='onboarding' || state.screen==='intro' || state.screen==='playing'){ renderOnboard(); }
+  }
+
+  /* ---------------- admin-managed backgrounds (start screen + playing screen) ---------------- */
+  function applyCustomBackgrounds(branding){
+    const startImg = branding.startBgImage || null;
+    const startBgCss = startImg ? `linear-gradient(rgba(243,247,242,.86),rgba(243,247,242,.86)), url('${startImg}')` : '';
+    [onboardingEl, introEl, registerScreen].forEach(el=>{
+      el.style.backgroundImage = startBgCss;
+      el.style.backgroundSize = startImg ? 'cover' : '';
+      el.style.backgroundPosition = startImg ? 'center' : '';
+    });
+    splashScreen.style.backgroundImage = startImg
+      ? `linear-gradient(rgba(8,17,12,.62),rgba(8,17,12,.62)), url('${startImg}')` : '';
+    splashScreen.style.backgroundSize = startImg ? 'cover' : '';
+    splashScreen.style.backgroundPosition = startImg ? 'center' : '';
+
+    const playImg = branding.playBgImage || null;
+    if(playImg){
+      scenePhotoDay.style.backgroundImage = `url('${playImg}')`;
+      scenePhotoNight.style.backgroundImage = `url('${playImg}')`;
+    } else {
+      scenePhotoDay.style.backgroundImage = 'linear-gradient(155deg,#9bd6b3 0%,#397d5b 48%,#0e2a20 100%)';
+      scenePhotoNight.style.backgroundImage = 'linear-gradient(155deg,#24455b 0%,#15362f 48%,#081511 100%)';
+    }
+  }
+
+  /* ---------------- announcements (climate events & promotions posted by admin) ---------------- */
+  function renderAnnouncements(events){
+    const active = (events||[]).filter(ev=>ev.active);
+    const renderCard = (ev)=>`
+      <div class="announce-card">
+        <div class="ac-emoji">${escapeHtml(ev.emoji||'🌍')}</div>
+        <div>
+          <div class="ac-title-row"><span class="ac-title">${escapeHtml(ev.title||'')}</span><span class="ac-tag ${ev.type==='promo'?'promo':'event'}">${ev.type==='promo'?'Promo':'Event'}</span></div>
+          <div class="ac-body">${escapeHtml(ev.body||'')}</div>
+        </div>
+      </div>`;
+
+    if(!active.length){
+      announcementsBlock.hidden = true;
+      announcementsList.innerHTML='';
+      eventsList.innerHTML='<div class="update-empty">No climate events yet.</div>';
+      promosList.innerHTML='<div class="update-empty">No promotions active right now.</div>';
+      return;
+    }
+
+    announcementsBlock.hidden = false;
+    announcementsList.innerHTML = active.map(renderCard).join('');
+
+    const eventsOnly = active.filter(ev=>ev.type!=='promo');
+    const promosOnly = active.filter(ev=>ev.type==='promo');
+    eventsList.innerHTML = eventsOnly.length ? eventsOnly.map(renderCard).join('') : '<div class="update-empty">No climate events right now.</div>';
+    promosList.innerHTML = promosOnly.length ? promosOnly.map(renderCard).join('') : '<div class="update-empty">No promotions right now.</div>';
+  }
+
+  /* ---------------- element refs ---------------- */
+  const $ = (id)=>document.getElementById(id);
+  const splashScreen=$('splashScreen');
+  const welcomeIntro=$('welcomeIntro'), welcomeStartBtn=$('welcomeStartBtn'), welcomeSkipBtn=$('welcomeSkipBtn');
+  const registerScreen=$('registerScreen'), regInput=$('regInput'), regEmail=$('regEmail'), regPassword=$('regPassword'), regError=$('regError'), regSubmitBtn=$('regSubmitBtn'), authModeBtn=$('authModeBtn');
+  const onboardingEl=$('onboarding'), obIcon=$('obIcon'), obTitle=$('obTitle'), obBody=$('obBody'), obDots=$('obDots'), obBtn=$('obBtn');
+  const introEl=$('levelIntro'), introTitle=$('introTitle'), introBody=$('introBody'), introStartBtn=$('introStartBtn');
+  const playArea=$('playArea'), scene=$('scene'), itemsLayer=$('itemsLayer'), scenePhotoDay=$('scenePhotoDay'), scenePhotoNight=$('scenePhotoNight'), smogOverlay=$('smogOverlay');
+  const chipTime=$('chipTime'), chipScore=$('chipScore'), comboPop=$('comboPop'), stormBanner=$('stormBanner');
+  const healthFill=$('healthFill'), healthValue=$('healthValue'), progressFill=$('progressFill'), progressValue=$('progressValue');
+  const pauseBtn=$('pauseBtn'), helpBtn=$('helpBtn');
+  const pauseOverlay=$('pauseOverlay'), factText=$('factText'), resumeBtn=$('resumeBtn'), restartBtn=$('restartBtn'), endGameBtn=$('endGameBtn');
+  const completeOverlay=$('completeOverlay'), completeTitle=$('completeTitle'), completeBody=$('completeBody'), nextLevelBtn=$('nextLevelBtn');
+  const gameoverOverlay=$('gameoverOverlay'), gameoverTitle=$('gameoverTitle'), gameoverBody=$('gameoverBody'), retryBtn=$('retryBtn'), restartFromOneLink=$('restartFromOneLink');
+  const legendOverlay=$('legendOverlay'), legendGrid=$('legendGrid'), legendCloseBtn=$('legendCloseBtn');
+  const inviteLink=$('inviteLink'), copyBtn=$('copyBtn'), shareBtn=$('shareBtn'), inviteFriendsCount=$('inviteFriendsCount'), inviteBonusEarned=$('inviteBonusEarned');
+  const leaderList=$('leaderList'), myRankRow=$('myRankRow');
+  const profAvatar=$('profAvatar'), profTierBadge=$('profTierBadge'), profTotalScore=$('profTotalScore'), profDailyScore=$('profDailyScore'), profWeeklyScore=$('profWeeklyScore'), profGames=$('profGames'), profBestLevel=$('profBestLevel'), profStreak=$('profStreak');
+  const profName=$('profName'), profUsername=$('profUsername'), profTagline=$('profTagline'), profContacts=$('profContacts'), aboutCredit=$('aboutCredit');
+  const soundToggle=$('soundToggle'), howToPlayRow=$('howToPlayRow');
+  const profileLeaderboardConsent=$('profileLeaderboardConsent');
+  const editProfileBtn=$('editProfileBtn'), editProfileOverlay=$('editProfileOverlay'), editNameInput=$('editNameInput'), editTaglineInput=$('editTaglineInput');
+  const emojiGrid=$('emojiGrid'), colorGrid=$('colorGrid'), saveProfileBtn=$('saveProfileBtn'), cancelProfileBtn=$('cancelProfileBtn');
+  const avatarUploadPreview=$('avatarUploadPreview'), uploadPhotoBtn=$('uploadPhotoBtn'), removePhotoBtn=$('removePhotoBtn'), avatarFileInput=$('avatarFileInput');
+  const themeChip=$('themeChip');
+  const toastEl=$('toastEl');
+  const maintenanceScreen=$('maintenanceScreen');
+  const announcementsBlock=$('announcementsBlock'), announcementsList=$('announcementsList');
+  const eventsList=$('eventsList'), promosList=$('promosList');
+
+  /* ---------------- helpers ---------------- */
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.remove('show'); void toastEl.offsetWidth; toastEl.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(()=>toastEl.classList.remove('show'), 1800);
+  }
+  function escapeHtml(value){
+    return String(value ?? '').replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+  function ensureAudio(){
+    if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+    if(actx && actx.state==='suspended') actx.resume();
+  }
+  function playTone(type){
+    if(!state.settings.sound || !actx) return;
+    const now = actx.currentTime;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.connect(g); g.connect(actx.destination);
+    const map = {
+      tap:{f:660,d:.09,t:'sine'}, bad:{f:150,d:.17,t:'sawtooth'},
+      combo:{f:880,d:.12,t:'triangle'}, complete:{f:520,d:.4,t:'sine'}, fail:{f:110,d:.5,t:'sawtooth'},
+    };
+    const m = map[type]||map.tap;
+    o.type = m.t; o.frequency.setValueAtTime(m.f, now);
+    g.gain.setValueAtTime(.0001, now);
+    g.gain.exponentialRampToValueAtTime(.16, now+.01);
+    g.gain.exponentialRampToValueAtTime(.0001, now+m.d);
+    o.start(now); o.stop(now+m.d+.03);
+  }
+  function haptic(style){
+    const h = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback;
+    if(h && h.impactOccurred) h.impactOccurred(style==='heavy'?'heavy':'light');
+  }
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function hexToRgb(hex){ const n=parseInt(hex.slice(1),16); return [n>>16&255,n>>8&255,n&255]; }
+  function rgbHex(r,g,b){ return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join(''); }
+  function lerpColor(a,b,t){ const A=hexToRgb(a),B=hexToRgb(b); return rgbHex(lerp(A[0],B[0],t),lerp(A[1],B[1],t),lerp(A[2],B[2],t)); }
+  function initials(name){ return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+  function currentTier(score){ let t=TIERS[0]; for(const tier of TIERS){ if(score>=tier.min) t=tier; } return t; }
+
+  // Backdrop alternates between the two art scenes level to level (odd levels = day/growth
+  // scene, even levels = night/circuit scene) with a cross-fade — see .scene-photo.active.
+  function applyTheme(){
+    const useNight = state.level % 2 === 0;
+    scenePhotoDay.classList.toggle('active', !useNight);
+    scenePhotoNight.classList.toggle('active', useNight);
+    // Dynamic parallax intensity increases with level for more 3D feel
+    const parallaxIntensity = 1 + Math.min(0.5, (state.level - 1) * 0.1);
+    const root = document.getElementById('app');
+    if(root) root.style.setProperty('--parallax-scale', parallaxIntensity.toFixed(2));
+  }
+  function flashLevelChip(n){
+    themeChip.textContent = '📍 Level '+n;
+    themeChip.classList.add('show');
+    clearTimeout(flashLevelChip._t);
+    flashLevelChip._t = setTimeout(()=>themeChip.classList.remove('show'), 2600);
+  }
+  function applyHealthGrading(health){
+    const t = Math.max(0,Math.min(100,health))/100;
+    scene.style.setProperty('--sat', (0.35+t*0.65).toFixed(2));
+    scene.style.setProperty('--bri', (0.86+t*0.14).toFixed(2));
+    smogOverlay.style.opacity = (1-t)*0.8;
+  }
+
+  /* ---------------- screen switching ---------------- */
+  function goScreen(name){
+    state.screen = name;
+    onboardingEl.hidden = name!=='onboarding';
+    introEl.hidden = name!=='intro';
+    playArea.hidden = (name==='onboarding' || name==='intro');
+    pauseOverlay.hidden = name!=='paused';
+    completeOverlay.hidden = name!=='complete';
+    gameoverOverlay.hidden = name!=='gameover';
+  }
+  const tabHistory = [];
+  function goBack(){
+    if(tabHistory.length > 1){
+      tabHistory.pop();
+      const prev = tabHistory[tabHistory.length - 1];
+      goToTab(prev, false);
+      return;
+    }
+    goToTab('game', false);
+  }
+  function goToTab(tab, push=true){
+    if(maintenanceOn) return; // keep the "back soon" screen up — don't let nav peek behind it
+    if(tab===state.tab) return;
+    if(push && state.tab){ tabHistory.push(state.tab); }
+    if(state.tab==='game' && state.screen==='playing') pauseGame();
+    state.tab = tab;
+    document.querySelectorAll('.screen').forEach(s=>{ s.hidden = s.dataset.tab!==tab; });
+    document.querySelectorAll('.nav-btn').forEach(b=>{ b.classList.toggle('active', b.dataset.tab===tab); });
+    if(tab==='leaderboard') renderLeaderboard(state.leaderboardPeriod);
+    if(tab==='profile') renderProfile();
+    if(tab==='updates') renderAnnouncements(remoteConfig && Array.isArray(remoteConfig.events) ? remoteConfig.events : []);
+    if(tab==='invite') renderInvite();
+  }
+
+  /* ---------------- welcome intro flow ---------------- */
+  function showWelcomeIntro(){
+    state.screen = 'welcome';
+    welcomeIntro.hidden = false;
+    registerScreen.hidden = true;
+    onboardingEl.hidden = true;
+    introEl.hidden = true;
+    playArea.hidden = true;
+  }
+  async function proceedAfterIntro(){
+    welcomeIntro.hidden = true;
+    state.screen = 'register';
+    const signedIn = await restorePlayerAccount();
+    if(signedIn) startLevelIntro(1);
+    else registerScreen.hidden = false;
+  }
+  welcomeStartBtn.addEventListener('click', proceedAfterIntro);
+  welcomeSkipBtn.addEventListener('click', proceedAfterIntro);
+
+  /* ---------------- onboarding ---------------- */
+  function renderOnboard(){
+    const step = ONBOARD[state.onboardStep];
+    obIcon.textContent = step.icon; obTitle.textContent = step.title; obBody.textContent = step.body;
+    [...obDots.children].forEach((d,i)=>d.classList.toggle('active', i===state.onboardStep));
+    obBtn.textContent = state.onboardStep===ONBOARD.length-1 ? "Let's Play" : 'Continue';
+  }
+  obBtn.addEventListener('click', ()=>{
+    if(state.onboardStep < ONBOARD.length-1){ state.onboardStep++; renderOnboard(); }
+    else { startLevelIntro(1); }
+  });
+
+  /* ---------------- difficulty ramp: simple -> hard ----------------
+     Level 1 has zero hazards — just good items to tap toward the Eco-Score goal.
+     Hazards phase in gradually over the next few levels, then storms kick in later. */
+  function hazardFactor(level){
+    return Math.min(1, Math.max(0, (level-1)/(DIFFICULTY.hazardRampLevels-1)));
+  }
+  function levelScore(){ return state.score - state.scoreAtLevelStart; }
+
+  /* ---------------- spawn lanes: reshuffled every level ----------------
+     Icons drop from a shuffled set of horizontal lanes (re-shuffled on every
+     new level, and again each time the shuffled order has been used once
+     through) instead of pure per-tap randomness, so the pattern visibly
+     changes level to level and never feels like it's repeating. */
+  const LANES = [10,20,30,40,50,60,70,80,90];
+  let laneOrder = [], laneCursor = 0;
+  function shuffleLanes(){
+    laneOrder = LANES.slice();
+    for(let i=laneOrder.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [laneOrder[i],laneOrder[j]] = [laneOrder[j],laneOrder[i]];
+    }
+    laneCursor = 0;
+  }
+  function nextLaneX(){
+    if(!laneOrder.length || laneCursor >= laneOrder.length) shuffleLanes();
+    const x = laneOrder[laneCursor] + (Math.random()*8-4); // small jitter so it isn't grid-locked
+    laneCursor++;
+    if(laneCursor >= laneOrder.length || (state.level >= 4 && Math.random() < 0.18)) shuffleLanes();
+    return Math.min(94, Math.max(6, x));
+  }
+  // Fall speed accelerates faster at higher levels (not just linearly) so later
+  // levels feel noticeably more intense, on top of whatever the admin configures
+  // as the base speed/step in Levels & Difficulty.
+  function levelFallSpeed(level){
+    const levelBoost = 1 + Math.max(0, level-1) * 0.14;
+    return DIFFICULTY.itemSpeedBase + level*DIFFICULTY.itemSpeedPerLevel*levelBoost;
+  }
+
+  /* ---------------- level flow ---------------- */
+  function startLevelIntro(n){
+    state.level = n;
+    shuffleLanes(); // fresh drop pattern every level
+    state.target = DIFFICULTY.targetBase+(n-1)*DIFFICULTY.targetStep;
+    state.duration = DIFFICULTY.durationSeconds;
+    state.isStorm = n>=DIFFICULTY.stormStartLevel && (n % DIFFICULTY.stormEveryNLevels === 0);
+    introTitle.textContent = state.isStorm ? `Level ${n}: Pollution Storm ⚠️` : `Level ${n}: Climate Tap Challenge`;
+    if(state.isStorm){
+      introBody.textContent = 'Hazards are flooding in. Keep your eyes open for the rare green-ringed items and tap only those.';
+    } else if(n===1){
+      introBody.textContent = `Tap the green-ringed climate actions to reach ${state.target} Eco-Score. Nothing to avoid yet — just get comfortable tapping!`;
+    } else if(hazardFactor(n) < 1){
+      introBody.textContent = `Reach ${state.target} Eco-Score. A few hazards ringed in red are starting to show up — avoid those.`;
+    } else {
+      introBody.textContent = `Reach ${state.target} Eco-Score. Avoid anything ringed in red — it only hurts your planet.`;
+    }
+    goScreen('intro');
+  }
+  introStartBtn.addEventListener('click', beginPlay);
+
+  async function beginPlay(){
+    if(!accountAuthenticated){
+      setAuthMode('signin');
+      registerScreen.hidden = false;
+      playArea.hidden = true;
+      state.screen = 'register';
+      return;
+    }
+    try{
+      await startServerRun();
+    }catch(error){
+      toast(error.message || 'Could not start a verified game session.');
+      return;
+    }
+    state.health=100; state.combo=0; state.elapsed=0; state.sinceSpawn=0; state.shieldUntil=0;
+    state.scoreAtLevelStart = state.score;
+    state.levelStartAt = Date.now();
+    clearItems();
+    chipTime.textContent = 'Time: '+state.duration+'s';
+    applyTheme();
+    flashLevelChip(state.level);
+    updateHUD();
+    goScreen('playing');
+    if(state.isStorm){ stormBanner.hidden=false; setTimeout(()=>{ stormBanner.hidden=true; }, 3000); }
+    state.lastTs = 0;
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(frameLoop);
+  }
+
+  function frameLoop(ts){
+    if(state.screen!=='playing') return;
+    if(!state.lastTs) state.lastTs = ts;
+    const dt = Math.min(48, ts-state.lastTs);
+    state.lastTs = ts;
+
+    state.elapsed += dt;
+    const timeLeft = Math.max(0, state.duration - Math.floor(state.elapsed/1000));
+    if(timeLeft !== state.timeLeftDisplay){ state.timeLeftDisplay = timeLeft; chipTime.textContent = 'Time: '+timeLeft+'s'; }
+    if(timeLeft<=0){ failLevel('time'); return; }
+
+    state.sinceSpawn += dt;
+    const levelPressure = Math.max(0, state.level-1) * 38;
+    const interval = Math.max(DIFFICULTY.spawnIntervalMinMs, DIFFICULTY.spawnIntervalBaseMs - state.level*DIFFICULTY.spawnIntervalStepMs - levelPressure);
+    if(state.sinceSpawn > interval){ state.sinceSpawn = 0; spawnItem(); }
+
+    const sceneH = itemsLayer.clientHeight;
+    for(let i=state.items.length-1;i>=0;i--){
+      const it = state.items[i];
+      it.y += it.vy*dt/1000;
+      const age = ts-it.born;
+      const sway = Math.sin(age/600+it.seed)*6*it.swayDir;
+      it.el.style.transform = `translate(${sway}px, ${it.y}px)`;
+      // Remove when past the drop distance or age expires
+      it.vy += it.acc * dt/1000;
+      if(it.y > (it.dropDistance || sceneH+40) || age > it.life){ it.el.remove(); state.items.splice(i,1); }
+    }
+    rafId = requestAnimationFrame(frameLoop);
+  }
+
+  function shuffleArray(arr){
+    for(let i=arr.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [arr[i],arr[j]] = [arr[j],arr[i]];
+    }
+  }
+  function pickItem(){
+    const hf = hazardFactor(state.level);
+    const gm = state.isStorm?DIFFICULTY.stormGoodMult:1;
+    const bm = (state.isStorm?DIFFICULTY.stormBadMult:1) * hf;
+    const pool = CATALOG.slice();
+    shuffleArray(pool);
+    let total = 0;
+    const weighted = pool.map(it=>{ const w = it.w*(it.good?gm:bm); total += w; return {it, w}; });
+    let r = Math.random()*total;
+    for(const p of weighted){ r -= p.w; if(r <= 0) return p.it; }
+    return weighted[weighted.length-1].it;
+  }
+  function spawnItem(){
+    const def = pickItem();
+    const xPct = nextLaneX();
+    const el = document.createElement('button');
+    el.className = 'game-item neutral';
+    el.style.left = xPct+'%';
+    el.textContent = def.emoji;
+    el.setAttribute('aria-label', def.label);
+    itemsLayer.appendChild(el);
+    const levelLift = Math.max(0, state.level-1) * 6;
+    const sceneH = itemsLayer.clientHeight;
+    const dropDistance = sceneH + 90;
+    const speedJitter = (Math.random() - 0.5) * 16;
+    const baseSpeed = Math.max(18, levelFallSpeed(state.level) + speedJitter + levelLift * 0.2);
+    const acc = 0.18 + Math.random() * 0.6;
+    const obj = {
+      id:'it'+(itemSeq++), def, el, x:xPct, y:-50,
+      vy: baseSpeed,
+      acc,
+      seed: Math.random() * 10,
+      swayDir: Math.random() < .5 ? -1 : 1,
+      born: performance.now(),
+      life: Math.max(12000, dropDistance / baseSpeed * 1000 * 1.2),
+      dropDistance,
+    };
+    state.items.push(obj);
+    el.classList.add(def.good ? 'good' : 'bad');
+    if(def.power) el.classList.add('power');
+    el.addEventListener('pointerdown', ()=>tapItem(obj), {once:true});
+  }
+  function removeItemEl(it){ const idx = state.items.indexOf(it); if(idx > -1) state.items.splice(idx,1); it.el.remove(); }
+  function clearItems(){ state.items.forEach(it=>it.el.remove()); state.items = []; }
+
+  function tapItem(it){
+    if(!state.items.includes(it)) return;
+    const shielded = performance.now() < state.shieldUntil;
+    const x = it.x, y = it.y;
+    removeItemEl(it);
+    ensureAudio();
+    if(it.def.good){
+      state.combo = Math.min(6, state.combo+1);
+      const mult = 1+(state.combo-1)*0.15;
+      const gained = Math.round(it.def.pts*mult);
+      state.score += gained;
+      pushScoreLog(gained);
+      if(it.def.power==='shield') state.shieldUntil = performance.now()+5000;
+      popScore(x,y,'+'+gained,'good');
+      playTone(state.combo>=3?'combo':'tap');
+      haptic('light');
+      if(state.combo>=3) showCombo();
+    } else if(shielded){
+      popScore(x,y,'blocked','shield');
+      playTone('tap');
+    } else {
+      state.combo = 0;
+      state.score += it.def.pts;
+      pushScoreLog(it.def.pts);
+      state.health = Math.max(0, state.health+it.def.hp);
+      popScore(x,y,it.def.pts,'bad');
+      playTone('bad'); haptic('heavy'); shakeScene();
+    }
+    updateHUD();
+    savePlayerData();
+    syncLive();
+    if(state.health<=0){ failLevel('health'); return; }
+    if(levelScore()>=state.target){ completeLevel(); return; }
+  }
+
+  function popScore(x,y,text,kind){
+    const pop = document.createElement('div');
+    pop.className = 'score-pop '+kind;
+    pop.textContent = typeof text==='number' ? (text>0?'+':'')+text : text;
+    pop.style.left = x+'%'; pop.style.transform = `translateY(${y}px)`;
+    itemsLayer.appendChild(pop);
+    requestAnimationFrame(()=>pop.classList.add('rise'));
+    setTimeout(()=>pop.remove(), 720);
+  }
+  function showCombo(){
+    comboPop.textContent = 'x'+state.combo+' COMBO';
+    comboPop.classList.remove('pulse'); void comboPop.offsetWidth; comboPop.classList.add('pulse');
+  }
+  function shakeScene(){ scene.classList.remove('shake'); void scene.offsetWidth; scene.classList.add('shake'); }
+
+  function updateHUD(){
+    chipScore.textContent = 'Eco Score: '+state.score;
+    healthFill.style.width = Math.max(0, Math.min(100, state.health))+'%';
+    healthValue.textContent = Math.max(0, state.health)+'%';
+    const ls = Math.max(0, levelScore());
+    const progressPct = Math.min(100, Math.max(0, ls/state.target*100));
+    progressFill.style.width = progressPct+'%';
+    progressValue.textContent = Math.floor(ls)+'/'+state.target;
+    applyHealthGrading(state.health);
+  }
+
+  function pauseGame(){
+    if(state.screen!=='playing') return;
+    cancelAnimationFrame(rafId);
+    factText.textContent = '🌍 '+FACTS[Math.floor(Math.random()*FACTS.length)];
+    goScreen('paused');
+  }
+  function resumeGame(){ goScreen('playing'); state.lastTs=0; rafId=requestAnimationFrame(frameLoop); }
+  function restartLevel(){
+    rollbackCurrentLevelScoreLog();
+    state.score = state.scoreAtLevelStart;
+    currentRunId = null;
+    beginPlay();
+    savePlayerData();
+    syncLive();
+  }
+
+  function completeLevel(){
+    cancelAnimationFrame(rafId); clearItems();
+    const bonus = state.health>=80?50:state.health>=50?25:0;
+    const levelUpBonus = DIFFICULTY.levelUpBonus;
+    state.score += bonus + levelUpBonus;
+    state.levelUpPoints = (state.levelUpPoints || 0) + levelUpBonus;
+    if(bonus || levelUpBonus) pushScoreLog(bonus + levelUpBonus);
+    completeTitle.textContent = 'Level Complete! 🎉';
+    const bonusText = bonus > 0 ? ` +${bonus} health bonus` : '';
+    const levelupText = ` +${levelUpBonus} level-up points`;
+    completeBody.textContent = `You hit ${state.target}/${state.target} Eco Score and finished with ${state.health}% Planet Health.${bonusText}${levelupText}`;
+    updateHUD();
+    playTone('complete');
+    goScreen('complete');
+    currentRunFinish = finishServerRun('completed');
+    savePlayerData();
+    syncLive();
+  }
+  function failLevel(reason){
+    cancelAnimationFrame(rafId); clearItems();
+    savePlayerData();
+    syncLive();
+    playTone('fail'); haptic('heavy');
+    if(reason==='time'){
+      gameoverTitle.textContent = "Time's Up ⏳";
+      gameoverBody.textContent = `You reached ${Math.max(0,levelScore())}/${state.target} — so close. Try again to beat the clock.`;
+    } else {
+      gameoverTitle.textContent = 'Planet Health Depleted 💨';
+      gameoverBody.textContent = 'Too much pollution got through this time. Give it another shot.';
+    }
+    goScreen('gameover');
+    currentRunFinish = finishServerRun('failed');
+  }
+
+  pauseBtn.addEventListener('click', pauseGame);
+  resumeBtn.addEventListener('click', resumeGame);
+  restartBtn.addEventListener('click', restartLevel);
+  endGameBtn.addEventListener('click', ()=>{
+    rollbackCurrentLevelScoreLog();
+    state.score = state.scoreAtLevelStart;
+    cancelAnimationFrame(rafId);
+    clearItems();
+    currentRunId = null;
+    startLevelIntro(state.level);
+  });
+  nextLevelBtn.addEventListener('click', ()=>startLevelIntro(state.level+1));
+  retryBtn.addEventListener('click', restartLevel);
+  restartFromOneLink.addEventListener('click', ()=>{ state.scoreLog=[]; state.levelStartAt = Date.now(); startLevelIntro(1); });
+
+  /* ---------------- legend ---------------- */
+  function openLegend(){
+    legendGrid.innerHTML = CATALOG.map(it=>`<div class="legend-item ${it.good?'ring-good':'ring-bad'}"><span class="legend-emoji">${it.emoji}</span><span class="legend-label">${it.label}</span><span class="legend-pts">${it.pts>0?'+':''}${it.pts}</span></div>`).join('');
+    legendOverlay.hidden = false;
+    if(state.tab==='game' && state.screen==='playing') pauseGame();
+  }
+  helpBtn.addEventListener('click', openLegend);
+  howToPlayRow.addEventListener('click', openLegend);
+  legendCloseBtn.addEventListener('click', ()=>{ legendOverlay.hidden = true; });
+  const legendCloseX = $('legendCloseX');
+  if(legendCloseX) legendCloseX.addEventListener('click', ()=>{ legendOverlay.hidden = true; });
+  legendOverlay.addEventListener('click', (event)=>{
+    if(event.target === legendOverlay){ legendOverlay.hidden = true; }
+  });
+
+  /* ---------------- nav ---------------- */
+  document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click', ()=>goToTab(b.dataset.tab)));
+  const backBtnEl = $('backBtn');
+  if(backBtnEl) backBtnEl.addEventListener('click', goBack);
+  $('refreshBtn').addEventListener('click', ()=>window.location.reload());
+
+  /* ---------------- invite tab ---------------- */
+  function renderInvite(){
+    const link = buildReferralLink();
+    inviteLink.textContent = link;
+    inviteFriendsCount.textContent = profile.referrals;
+    inviteBonusEarned.textContent = '0';
+  }
+  copyBtn.addEventListener('click', ()=>{
+    const link = buildReferralLink();
+    if(navigator.clipboard){ navigator.clipboard.writeText(link).then(()=>toast('Link copied!')).catch(()=>toast('Long-press the link to copy')); }
+    else toast('Long-press the link to copy');
+  });
+  shareBtn.addEventListener('click', ()=>{
+    const link = buildReferralLink();
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if(tg && tg.openTelegramLink){
+      tg.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(link)+'&text='+encodeURIComponent('Join me in Climate Game! 🌍'));
+    } else if(navigator.share){
+      navigator.share({title:'Climate Game', text:'Join me in Climate Game! 🌍', url:link}).catch(()=>{});
+    } else {
+      copyBtn.click();
+    }
+  });
+
+  /* ---------------- leaderboard tab ---------------- */
+  function loadAdminLeaderboard(){
+    try{
+      const raw = localStorage.getItem(PLAYERS_KEY);
+      if(!raw) return [];
+      const players = JSON.parse(raw);
+      if(!Array.isArray(players)) return [];
+      const removed = loadRemovedPlayers();
+      return players
+        .filter(player => {
+          if(!player || !player.id) return false;
+          const keyName = (player.username||player.name||'').replace(/^@/,'').trim().toLowerCase();
+          if(removed.ids.has(player.id) || removed.liveIds.has(player.id)) return false;
+          if(keyName && removed.usernames.has(keyName)) return false;
+          return true;
+        })
+        .map(player => ({
+          id: player.id,
+          name: player.name || player.username || 'Player',
+          username: player.username || '',
+          score: Number(player.score) || 0,
+          dailyScore: Number(player.dailyScore) || 0,
+          weeklyScore: Number(player.weeklyScore) || 0,
+          me: player.id === profile.id,
+        }));
+    }catch(e){ return []; }
+  }
+
+  async function loadLeaderboardRows(period){
+    const apiBase = (window.API_BASE_URL || (window.GAME_CONFIG && window.GAME_CONFIG.apiBaseUrl) || window.location.origin || '').replace(/\/$/, '');
+    if(apiBase){
+      try{
+        const client = window.StorageBridge && window.StorageBridge.getClient();
+        const {data:{session}} = client ? await client.auth.getSession() : {data:{session:null}};
+        const headers = session?.access_token ? {Authorization:`Bearer ${session.access_token}`} : {};
+        const response = await fetch(`${apiBase}/api/leaderboard?period=${encodeURIComponent(period || 'daily')}`, { credentials: 'include', headers });
+        if(response.ok){
+          const data = await response.json();
+          competitionUnavailable = data.competitionEnabled !== true;
+          if(competitionUnavailable) return [];
+          const rows = Array.isArray(data.leaderboard) ? data.leaderboard : Array.isArray(data.rows) ? data.rows : [];
+          return rows.map(player => ({
+            id: player.me ? profile.id : null,
+            name: player.name || player.username || 'Player',
+            score: Number(player.score) || 0,
+            dailyScore: Number(player.dailyScore) || 0,
+            weeklyScore: Number(player.weeklyScore) || 0,
+            me: Boolean(player.me),
+          }));
+        }
+      }catch(e){
+        console.warn('[leaderboard] server leaderboard unavailable', e);
+      }
+    }
+    competitionUnavailable = true;
+    return [];
+  }
+
+  async function renderLeaderboard(period){
+    state.leaderboardPeriod = period;
+    document.querySelectorAll('.period-pill').forEach(b=>b.classList.toggle('active', b.dataset.period===period));
+    const periodScores = computePeriodScores();
+    const myScore = period==='alltime' ? state.score : (accountAuthenticated ? (serverPeriods[period] || 0) : (periodScores[period] ?? 0));
+    const liveRows = await loadLeaderboardRows(period);
+    const title = document.querySelector('.lead-hero h1');
+    if(title) title.textContent = competitionUnavailable ? 'Rankings Preview' : 'Global Rankings';
+    if(competitionUnavailable){
+      leaderList.innerHTML = '<li class="lead-row"><span class="lead-name">Shared rankings are paused until verified accounts and secure score storage are ready. You can still play and learn on this device.</span></li>';
+      myRankRow.hidden = true;
+      return;
+    }
+    const rows = liveRows.sort((a,b) => b.score - a.score);
+    let myRank = rows.findIndex(r => r.me) + 1;
+    if(myRank === 0){
+      const inserted = {name:'You', score: myScore, me:true};
+      myRank = rows.filter(r => r.score > myScore).length + 1;
+      if(myRank <= 10){
+        rows.splice(myRank-1, 0, inserted);
+      }
+    }
+    leaderList.innerHTML = '';
+    rows.slice(0,10).forEach((row,i)=>{
+      const li = document.createElement('li');
+      li.className = 'lead-row'+(row.me?' me':'');
+      const rank = document.createElement('span'); rank.className = 'lead-rank'; rank.textContent = String(i+1);
+      const avatar = document.createElement('span'); avatar.className = 'lead-avatar'; avatar.textContent = initials(row.name || 'Eco Player');
+      const name = document.createElement('span'); name.className = 'lead-name'; name.textContent = row.name || 'Eco Player';
+      const score = document.createElement('span'); score.className = 'lead-score'; score.textContent = Number(row.score || 0).toLocaleString();
+      li.append(rank, avatar, name, score);
+      leaderList.appendChild(li);
+    });
+    if(myRank > 10){
+      myRankRow.hidden = false;
+      myRankRow.innerHTML = `<span class="lead-rank">${myRank}</span><span class="lead-avatar">${initials('You')}</span><span class="lead-name">You</span><span class="lead-score">${myScore.toLocaleString()}</span>`;
+    } else {
+      myRankRow.hidden = true;
+    }
+    if(rows.length === 0){
+      leaderList.innerHTML = '<li class="lead-row"><span class="lead-name">No live leaderboard data yet</span></li>';
+      myRankRow.hidden = true;
+    }
+    if(rows.length > 10){
+      while(rows.length > 10) rows.pop();
+    }
+  }
+  document.querySelectorAll('.period-pill').forEach(b=>b.addEventListener('click', ()=>renderLeaderboard(b.dataset.period)));
+
+  /* ---------------- profile tab ---------------- */
+  function renderProfile(){
+    const tier = currentTier(state.score);
+    profTierBadge.textContent = tier.icon+' '+tier.name;
+    const periodScores = computePeriodScores();
+    profTotalScore.textContent = state.score;
+    profDailyScore.textContent = accountAuthenticated ? serverPeriods.daily : periodScores.daily;
+    profWeeklyScore.textContent = accountAuthenticated ? serverPeriods.weekly : periodScores.weekly;
+    profGames.textContent = profile.gamesPlayed;
+    profBestLevel.textContent = profile.bestLevel;
+    profStreak.textContent = profile.streak;
+    profName.textContent = profile.name;
+    profUsername.textContent = profile.username || profile.regValue || '';
+    profContacts.textContent = 'Contact details are not collected in this preview.';
+    profTagline.textContent = profile.tagline;
+    if(profileLeaderboardConsent) profileLeaderboardConsent.checked = !!profile.leaderboardOptIn;
+    renderAvatarInto(profAvatar, profile);
+    aboutCredit.textContent = profile.name;
+  }
+  // Renders either the uploaded photo or the emoji+color combo into any avatar-shaped element.
+  function renderAvatarInto(el, p){
+    if(p.avatarPhoto){
+      el.innerHTML = `<img src="${p.avatarPhoto}" alt="">`;
+      el.style.background = 'transparent';
+    } else {
+      el.textContent = p.avatarEmoji;
+      el.style.background = AVATAR_COLORS[p.avatarColorIdx];
+    }
+  }
+
+  /* ---------------- edit profile modal ---------------- */
+  let editEmoji = profile.avatarEmoji, editColorIdx = profile.avatarColorIdx, editPhoto = profile.avatarPhoto || null;
+  function refreshAvatarPreview(){
+    renderAvatarInto(avatarUploadPreview, {avatarPhoto:editPhoto, avatarEmoji:editEmoji, avatarColorIdx:editColorIdx});
+    removePhotoBtn.hidden = !editPhoto;
+  }
+  function openEditProfile(){
+    editNameInput.value = profile.name;
+    editTaglineInput.value = profile.tagline;
+    editEmoji = profile.avatarEmoji; editColorIdx = profile.avatarColorIdx; editPhoto = profile.avatarPhoto || null;
+    refreshAvatarPreview();
+    emojiGrid.innerHTML = AVATAR_EMOJIS.map(e=>`<button type="button" class="emoji-opt${e===editEmoji?' active':''}" data-emoji="${e}">${e}</button>`).join('');
+    colorGrid.innerHTML = AVATAR_COLORS.map((c,i)=>`<button type="button" class="color-opt${i===editColorIdx?' active':''}" data-idx="${i}" style="background:${c}"></button>`).join('');
+    emojiGrid.querySelectorAll('.emoji-opt').forEach(b=>b.addEventListener('click', ()=>{
+      editEmoji = b.dataset.emoji;
+      emojiGrid.querySelectorAll('.emoji-opt').forEach(x=>x.classList.toggle('active', x===b));
+      refreshAvatarPreview();
+    }));
+    colorGrid.querySelectorAll('.color-opt').forEach(b=>b.addEventListener('click', ()=>{
+      editColorIdx = +b.dataset.idx;
+      colorGrid.querySelectorAll('.color-opt').forEach(x=>x.classList.toggle('active', x===b));
+      refreshAvatarPreview();
+    }));
+    editProfileOverlay.hidden = false;
+  }
+  editProfileBtn.addEventListener('click', openEditProfile);
+  cancelProfileBtn.addEventListener('click', ()=>{ editProfileOverlay.hidden = true; });
+
+  // Local-file profile photo is resized and stored only in this browser; it is
+  // intentionally not uploaded or shared with other player devices.
+  uploadPhotoBtn.addEventListener('click', ()=> avatarFileInput.click());
+  avatarFileInput.addEventListener('change', ()=>{
+    const file = avatarFileInput.files && avatarFileInput.files[0];
+    if(!file) return;
+    if(!file.type.startsWith('image/')){ toast('Please choose an image file'); return; }
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const size = 240;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(size/img.width, size/img.height);
+        const w = img.width*scale, h = img.height*scale;
+        ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+        editPhoto = canvas.toDataURL('image/jpeg', 0.85);
+        refreshAvatarPreview();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    avatarFileInput.value = '';
+  });
+  removePhotoBtn.addEventListener('click', ()=>{ editPhoto = null; refreshAvatarPreview(); });
+
+  saveProfileBtn.addEventListener('click', async ()=>{
+    const name = editNameInput.value.trim();
+    if(!name){ toast('Name cannot be empty'); return; }
+    const previousName = profile.name;
+    profile.name = name;
+    profile.tagline = editTaglineInput.value.trim() || profile.tagline;
+    profile.contactEmail = '';
+    profile.contactPhone = '';
+    profile.contactTelegram = '';
+    profile.avatarEmoji = editEmoji;
+    profile.avatarColorIdx = editColorIdx;
+    profile.avatarPhoto = editPhoto;
+    if(accountAuthenticated){
+      try{
+        const account = await requestPlayerApi('/api/account', {method:'PATCH', body:JSON.stringify({name})});
+        profile.name = account.name || name;
+      }catch(error){
+        profile.name = previousName;
+        toast(error.message || 'Could not save your display name.');
+        renderProfile();
+        return;
+      }
+    }
+    savePlayerData();
+    syncLive();
+    renderProfile();
+    editProfileOverlay.hidden = true;
+    toast('Profile updated!');
+  });
+  soundToggle.addEventListener('click', ()=>{
+    state.settings.sound = !state.settings.sound;
+    soundToggle.classList.toggle('on', state.settings.sound);
+    soundToggle.setAttribute('aria-checked', state.settings.sound);
+    if(state.settings.sound) ensureAudio();
+  });
+  document.querySelectorAll('.lang-pill').forEach(b=>b.addEventListener('click', ()=>{
+    document.querySelectorAll('.lang-pill').forEach(x=>x.classList.toggle('active', x===b));
+    state.settings.lang = b.dataset.lang;
+    if(b.dataset.lang==='am') toast('Amharic pack coming soon 🇪🇹');
+  }));
+
+  /* ---------------- registration ---------------- */
+  let authMode = 'signup';
+  function setAuthMode(mode){
+    authMode = mode;
+    regInput.closest('.reg-field').hidden = mode === 'signin';
+    $('leaderboardConsentWrap').hidden = mode === 'signin';
+    regSubmitBtn.textContent = mode === 'signup' ? 'Create Account' : 'Sign In';
+    authModeBtn.textContent = mode === 'signup' ? 'Already registered? Sign in' : 'New player? Create an account';
+    regPassword.autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+    regError.textContent = '';
+  }
+  authModeBtn.addEventListener('click', ()=>setAuthMode(authMode === 'signup' ? 'signin' : 'signup'));
+  regPassword.addEventListener('keydown', event=>{ if(event.key === 'Enter') regSubmitBtn.click(); });
+  function isRegistrationBlocked(method, value){
+    try{
+      const removed = loadRemovedPlayers();
+      const rawPlayers = localStorage.getItem(PLAYERS_KEY);
+      const players = rawPlayers ? JSON.parse(rawPlayers) : [];
+      const normalized = (method==='telegram' ? value.replace(/^@/,'') : value).toString().replace(/\s+/g,'').toLowerCase();
+      const inputUsername = normalized.replace(/^@/,'');
+
+      if(method==='telegram' && removed.usernames.has(inputUsername)){
+        return 'This Telegram username has been removed by the admin and cannot be re-registered.';
+      }
+
+      for(const p of players || []){
+        if(!p) continue;
+        const phone = (p.contactPhone||'').toString().replace(/\s+/g,'').toLowerCase();
+        const tel = (p.contactTelegram||'').replace(/^@/,'').toLowerCase();
+        const username = (p.username||'').replace(/^@/,'').toLowerCase();
+        const name = (p.name||'').replace(/^@/,'').toLowerCase();
+        const liveId = p.liveId || '';
+        const playerRemoved = removed.ids.has(p.id) || removed.liveIds.has(liveId) || removed.usernames.has(username) || removed.usernames.has(name);
+
+        if(method==='phone' && phone && phone === normalized && playerRemoved){
+          return 'This phone number belongs to a player removed by the admin and cannot be re-registered.';
+        }
+        if(method==='telegram' && tel && tel === inputUsername && playerRemoved){
+          return 'This Telegram account belongs to a player removed by the admin and cannot be re-registered.';
+        }
+        if(username && username === inputUsername && playerRemoved){
+          return 'This username has been removed by the admin and cannot be re-registered.';
+        }
+        if(method==='phone' && name && name === normalized && playerRemoved){
+          return 'This username has been removed by the admin and cannot be re-registered.';
+        }
+      }
+      return null;
+    }catch(e){ return null; }
+  }
+  function isInAdminRoster(){
+    try{
+      const raw = localStorage.getItem(PLAYERS_KEY);
+      if(!raw) return false;
+      const list = JSON.parse(raw);
+      const normReg = (profile.regValue||'').toString().replace(/^@/,'').replace(/\s+/g,'').toLowerCase();
+      const normPhone = (profile.contactPhone||'').toString().replace(/\s+/g,'').toLowerCase();
+      const normTelegram = (profile.contactTelegram||'').replace(/^@/,'').toLowerCase();
+      for(const p of list || []){
+        if(!p) continue;
+        if(profile.id && p.id && p.id === profile.id) return true;
+        const pVals = [p.username, p.contactTelegram, p.contactPhone, p.name];
+        for(const v of pVals){
+          if(!v) continue;
+          const norm = v.toString().replace(/^@/,'').replace(/\s+/g,'').toLowerCase();
+          if(norm && ((normReg && norm === normReg) || (normPhone && norm === normPhone) || (normTelegram && norm === normTelegram))) return true;
+        }
+      }
+      return false;
+    }catch(e){ return false; }
+  }
+  function addToAdminRoster(){
+    try{
+      const raw = localStorage.getItem(PLAYERS_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      const id = profile.id || ('p_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36));
+      if(!profile.id) profile.id = id;
+      const username = profile.username || (profile.regMethod==='telegram' ? profile.regValue : '');
+      const normU = (username||'').toString().replace(/^@/,'').trim().toLowerCase();
+      const normPhone = (profile.regMethod==='phone' ? (profile.regValue||'').toString().replace(/\s+/g,'').toLowerCase() : '');
+      const normTelegram = (profile.regMethod==='telegram' ? (profile.regValue||'').replace(/^@/,'').toString().toLowerCase() : '');
+      const exists = list.some(p => {
+        if(!p) return false;
+        const pId = p.id || '';
+        const pUsername = (p.username||'').replace(/^@/,'').toLowerCase();
+        const pPhone = (p.contactPhone||'').replace(/\s+/g,'').toLowerCase();
+        const pTelegram = (p.contactTelegram||'').replace(/^@/,'').toLowerCase();
+        return pId === id || (normU && pUsername === normU) || (normPhone && pPhone === normPhone) || (normTelegram && pTelegram === normTelegram);
+      });
+      if(exists) return;
+      const entry = {
+        id: id,
+        name: profile.name || '',
+        username: username || '',
+        contactEmail: profile.contactEmail || '',
+        contactPhone: profile.regMethod==='phone' ? profile.regValue || '' : profile.contactPhone || '',
+        contactTelegram: profile.regMethod==='telegram' ? profile.regValue || '' : profile.contactTelegram || '',
+        avatarEmoji: profile.avatarEmoji || '',
+        score: Number(profile.score || 0),
+        dailyScore: 0,
+        weeklyScore: 0,
+        bestLevel: profile.bestLevel || 1,
+        referrals: Number(profile.referrals || 0),
+        referralCode: profile.referralCode || sanitizeReferralCode(username || profile.regValue || id),
+        referrer: profile.referrer || '',
+        status: 'active',
+      };
+      list.push(entry);
+      localStorage.setItem(PLAYERS_KEY, JSON.stringify(list));
+    }catch(e){ /* ignore */ }
+  }
+  
+  regSubmitBtn.addEventListener('click', async ()=>{
+    const email = regEmail.value.trim().toLowerCase();
+    const password = regPassword.value;
+    const displayName = regInput.value.trim();
+    if(authMode === 'signup' && displayName.length < 2){ regError.textContent = 'Choose a display name with at least 2 characters.'; return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ regError.textContent = 'Enter a valid email address.'; return; }
+    if(password.length < 8){ regError.textContent = 'Use a password with at least 8 characters.'; return; }
+    const client = window.StorageBridge && window.StorageBridge.getClient();
+    if(!client){ regError.textContent = 'Multiplayer accounts are not configured yet. Please try again later.'; return; }
+    regSubmitBtn.disabled = true;
+    authModeBtn.disabled = true;
+    regError.textContent = '';
+    try{
+      const result = authMode === 'signup'
+        ? await client.auth.signUp({email, password, options:{data:{display_name:displayName, leaderboard_opt_in:$('leaderboardConsent').checked}, emailRedirectTo:window.location.origin}})
+        : await client.auth.signInWithPassword({email, password});
+      if(result.error) throw result.error;
+      if(authMode === 'signup' && !result.data.session){
+        regError.textContent = 'Check your email to confirm the account, then return here and sign in.';
+        setAuthMode('signin');
+        regEmail.value = email;
+        return;
+      }
+      if(!await restorePlayerAccount()) throw new Error('Your account signed in, but the player profile could not be loaded.');
+      registerScreen.hidden = true;
+      state.onboardStep = 0;
+      renderOnboard();
+      goScreen('onboarding');
+    }catch(error){
+      regError.textContent = error.message || 'Could not sign in. Please try again.';
+    }finally{
+      regSubmitBtn.disabled = false;
+      authModeBtn.disabled = false;
+    }
+  });
+  $('playerSignOutBtn').addEventListener('click', async ()=>{
+    const client = window.StorageBridge && window.StorageBridge.getClient();
+    if(client) await client.auth.signOut();
+    accountAuthenticated = false;
+    currentRunId = null;
+    profile.id = null; profile.name = 'Player'; profile.regMethod = null; profile.regValue = null;
+    profile.leaderboardOptIn = false;
+    state.score = 0; state.scoreLog = [];
+    regPassword.value = '';
+    setAuthMode('signin');
+    registerScreen.hidden = false;
+    goScreen('register');
+    renderProfile();
+  });
+  profileLeaderboardConsent.addEventListener('change', async ()=>{
+    if(!accountAuthenticated) return;
+    const previous = profile.leaderboardOptIn;
+    profile.leaderboardOptIn = profileLeaderboardConsent.checked;
+    try{
+      const account = await requestPlayerApi('/api/account', {method:'PATCH', body:JSON.stringify({leaderboardOptIn:profile.leaderboardOptIn})});
+      profile.leaderboardOptIn = Boolean(account.leaderboardOptIn);
+      profileLeaderboardConsent.checked = profile.leaderboardOptIn;
+    }catch(error){
+      profile.leaderboardOptIn = previous;
+      profileLeaderboardConsent.checked = previous;
+      toast(error.message || 'Could not update leaderboard privacy.');
+    }
+  });
+  $('deleteAccountBtn').addEventListener('click', async ()=>{
+    if(!accountAuthenticated || !confirm('Permanently delete your account, score history, and leaderboard entry? This cannot be undone.')) return;
+    try{
+      await requestPlayerApi('/api/account', {method:'DELETE'});
+      const client = window.StorageBridge && window.StorageBridge.getClient();
+      if(client) await client.auth.signOut();
+      accountAuthenticated = false;
+      currentRunId = null;
+      try{ localStorage.removeItem(PLAYER_KEY); }catch(e){}
+      profile.id = null; profile.name = 'Player'; profile.username = ''; profile.regMethod = null; profile.regValue = null;
+      profile.leaderboardOptIn = false;
+      state.score = 0; state.scoreLog = [];
+      setAuthMode('signup');
+      registerScreen.hidden = false;
+      goScreen('register');
+      renderProfile();
+    }catch(error){
+      toast(error.message || 'Account deletion failed. Please retry.');
+    }
+  });
+
+  /* ---------------- ambient parallax (climate-tech scenery) ----------------
+     Drives every `.parallax-layer` element (gameplay turbines/solar/clouds AND
+     the watermark illustration on Invite/Leaderboard/Profile) so the whole app
+     feels like one connected, responsive 3D-ish world instead of a flat image.
+     Pointer movement drives it on desktop; device tilt drives it on phones. */
+  (function initParallax(){
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const root = document.getElementById('app');
+    let parX = 0, parY = 0;
+    function setPar(x, y){
+      // Smooth parallax with easing for more natural 3D feel
+      parX += (x - parX) * 0.15;
+      parY += (y - parY) * 0.15;
+      const scale = parseFloat(root.style.getPropertyValue('--parallax-scale') || 1);
+      root.style.setProperty('--par-x', (parX * scale).toFixed(3));
+      root.style.setProperty('--par-y', (parY * scale).toFixed(3));
+    }
+    window.addEventListener('pointermove', (e)=>{
+      setPar((e.clientX/window.innerWidth)*2-1, (e.clientY/window.innerHeight)*2-1);
+    }, {passive:true});
+    window.addEventListener('touchmove', (e)=>{
+      const t = e.touches[0]; if(!t) return;
+      setPar((t.clientX/window.innerWidth)*2-1, (t.clientY/window.innerHeight)*2-1);
+    }, {passive:true});
+    window.addEventListener('deviceorientation', (e)=>{
+      if(e.gamma==null || e.beta==null) return;
+      setPar(Math.max(-1,Math.min(1,e.gamma/30)), Math.max(-1,Math.min(1,(e.beta-45)/30)));
+    }, {passive:true});
+  })();
+
+  /* ---------------- Telegram WebApp bootstrap (no-ops outside Telegram) ---------------- */
+  try{
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if(tg){ tg.ready(); tg.expand(); }
+  }catch(e){}
+
+  /* ---------------- init ----------------
+     Flow: splash (5s promo) -> registration (first time only) -> onboarding tutorial
+     (first time only) -> every session (new or returning) always begins at Level 1,
+     but a returning player's Eco-Score carries over from where they left off — only
+     the level/difficulty resets on each app open, never the score. */
+  applyRemoteConfig(loadConfig()); // admin-configured difficulty/items/backgrounds/maintenance/announcements, applied before anything renders
+  renderOnboard();
+  renderProfile();
+  applyTheme();
+  applyHealthGrading(100);
+  if(window.StorageBridge) window.StorageBridge.onReady(()=>restorePlayerAccount());
+  setInterval(()=>{ if(accountAuthenticated) savePlayerData(); }, 5000);
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible' && accountAuthenticated && state.screen!=='playing') restorePlayerAccount();
+  });
+
+  // Expose the current game/session state for diagnostics and accessibility tests.
+  window.syncLive = syncLive;
+  window.beginPlay = beginPlay;
+  window.renderProfile = renderProfile;
+  window.updateHUD = updateHUD;
+  window.state = state;
+  window.profile = profile;
+  window.gameDebug = { syncLive, applyAdminCommands, profile, state, LIVE_KEY, ADMIN_COMMAND_KEY, REMOVED_PLAYERS_KEY };
+
+  setTimeout(()=>{
+    splashScreen.classList.add('fade-out');
+    setTimeout(()=>{
+      splashScreen.hidden = true;
+      showWelcomeIntro();
+    }, 500);
+  }, 5000);
+
+})();
+</script>
+</body>
+</html>

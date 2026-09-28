@@ -1,0 +1,55 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "./climate-game-preview.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "./admin-dashboard.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "./privacy.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "./server-connection.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "./storage-bridge.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "./telegram-integration.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "./scripts/env-config.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "./api/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/admin",
+      "dest": "/admin-dashboard.html"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/",
+      "dest": "/climate-game-preview.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}
